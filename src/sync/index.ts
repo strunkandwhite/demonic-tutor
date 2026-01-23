@@ -8,6 +8,7 @@ import { getClient, closeClient } from "../core/db/client";
 import { createSeventeenLandsClient } from "../core/seventeen-lands";
 import type { SeventeenLandsDraftDetail } from "../core/seventeen-lands";
 import { getSyncMetadata, setSyncMetadata } from "../core/db/queries";
+import { augmentCards } from "../augment";
 
 const INITIAL_START_DATE = "2026-01-06";
 
@@ -207,6 +208,11 @@ async function sync() {
       allDraftIds.add(row.id as string);
     }
     await syncGames(db, api, allDraftIds, dryRun);
+
+    // Augment cards from Scryfall
+    if (!dryRun) {
+      await augmentCards();
+    }
 
     // Update last sync date after successful sync
     const today = new Date().toISOString().split("T")[0];
