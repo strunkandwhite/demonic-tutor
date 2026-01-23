@@ -10,18 +10,29 @@ async function migrate() {
   console.log("Running migrations...");
   const client = await getClient();
 
-  // Split by semicolon and execute each statement
   const statements = CREATE_TABLES_SQL
     .split(";")
     .map(s => s.trim())
     .filter(s => s.length > 0);
 
-  for (const sql of statements) {
-    await client.execute(sql);
+  for (let i = 0; i < statements.length; i++) {
+    const sql = statements[i];
+    try {
+      await client.execute(sql);
+    } catch (error) {
+      console.error(`Migration failed at statement ${i + 1}:`);
+      console.error(sql);
+      console.error(error);
+      closeClient();
+      process.exit(1);
+    }
   }
 
   console.log("Migrations complete.");
   closeClient();
 }
 
-migrate().catch(console.error);
+migrate().catch(error => {
+  console.error("Migration failed:", error);
+  process.exit(1);
+});
