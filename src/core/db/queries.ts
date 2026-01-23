@@ -3,7 +3,7 @@
  */
 
 import { getClient } from "./client";
-import type { Draft, Pick, CardStats } from "./schema";
+import type { Draft, Pick, CardStats, Card, Decklist } from "./schema";
 
 export interface ListDraftsParams {
   set?: string;
@@ -241,4 +241,197 @@ export async function setSyncMetadata(key: string, value: string): Promise<void>
     sql: "INSERT OR REPLACE INTO sync_metadata (key, value) VALUES (?, ?)",
     args: [key, value],
   });
+}
+
+export interface DeckWithCards {
+  draft_id: string;
+  main_colors: string | null;
+  splash_colors: string | null;
+  maindeck: Array<Card & { quantity: number }>;
+  sideboard: Array<Card & { quantity: number }>;
+}
+
+export async function getDeck(draftId: string): Promise<DeckWithCards | null> {
+  const db = await getClient();
+
+  // Get decklist metadata
+  const deckResult = await db.execute({
+    sql: "SELECT * FROM decklists WHERE draft_id = ?",
+    args: [draftId],
+  });
+
+  if (deckResult.rows.length === 0) {
+    return null;
+  }
+
+  const decklist = deckResult.rows[0] as unknown as Decklist;
+
+  // Get cards with full details
+  const cardsResult = await db.execute({
+    sql: `SELECT dc.quantity, dc.is_maindeck, c.*
+          FROM decklist_cards dc
+          JOIN cards c ON dc.card_name = c.name
+          WHERE dc.draft_id = ?`,
+    args: [draftId],
+  });
+
+  const maindeck: Array<Card & { quantity: number }> = [];
+  const sideboard: Array<Card & { quantity: number }> = [];
+
+  for (const row of cardsResult.rows) {
+    const card = {
+      name: row.name as string,
+      image_url: row.image_url as string | null,
+      types: row.types as string | null,
+      mana_cost: row.mana_cost as string | null,
+      colors: row.colors as string | null,
+      oracle_id: row.oracle_id as string | null,
+      oracle_text: row.oracle_text as string | null,
+      cmc: row.cmc as number | null,
+      rarity: row.rarity as string | null,
+      quantity: row.quantity as number,
+    };
+
+    if (row.is_maindeck === 1) {
+      maindeck.push(card);
+    } else {
+      sideboard.push(card);
+    }
+  }
+
+  return {
+    draft_id: decklist.draft_id,
+    main_colors: decklist.main_colors,
+    splash_colors: decklist.splash_colors,
+    maindeck,
+    sideboard,
+  };
+}
+
+export interface SearchDecksParams {
+  card_name: string;
+  in_maindeck?: boolean;
+  set?: string;
+  min_wins?: number;
+}
+
+export interface SearchDecksResult {
+  draft_id: string;
+  set: string;
+  wins: number;
+  losses: number;
+  in_maindeck: boolean;
+  quantity: number;
+}
+
+export async function searchDecks(params: SearchDecksParams): Promise<SearchDecksResult[]> {
+  const db = await getClient();
+  const conditions: string[] = ["dc.card_name = ?"];
+  const args: (string | number)[] = [params.card_name];
+
+  if (params.in_maindeck !== undefined) {
+    conditions.push("dc.is_maindeck = ?");
+    args.push(params.in_maindeck ? 1 : 0);
+  }
+
+  if (params.set) {
+    conditions.push('d."set" = ?');
+    args.push(params.set);
+  }
+
+  if (params.min_wins !== undefined) {
+    conditions.push("d.wins >= ?");
+    args.push(params.min_wins);
+  }
+
+  const result = await db.execute({
+    sql: `SELECT d.id as draft_id, d."set", d.wins, d.losses, dc.is_maindeck, dc.quantity
+          FROM decklist_cards dc
+          JOIN drafts d ON dc.draft_id = d.id
+          WHERE ${conditions.join(" AND ")}
+          ORDER BY d.draft_date DESC
+          LIMIT 100`,
+    args,
+  });
+
+  return result.rows.map((r) => ({
+    draft_id: r.draft_id as string,
+    set: r.set as string,
+    wins: r.wins as number,
+    losses: r.losses as number,
+    in_maindeck: r.is_maindeck === 1,
+    quantity: r.quantity as number,
+  }));
+}
+
+export interface DeckChoiceAnalysis {
+  draft_id: string;
+  wins: number;
+  losses: number;
+  sideboard_analysis: Array<{
+    name: string;
+    quantity: number;
+    gih_wr: number | null;
+    avg_taken_at: number | null;
+    assessment: string;
+  }>;
+}
+
+export async function analyzeDeckChoices(draftId: string): Promise<DeckChoiceAnalysis | null> {
+  const db = await getClient();
+
+  // Get draft info
+  const draftResult = await db.execute({
+    sql: 'SELECT id, "set", wins, losses FROM drafts WHERE id = ?',
+    args: [draftId],
+  });
+
+  if (draftResult.rows.length === 0) {
+    return null;
+  }
+
+  const draft = draftResult.rows[0];
+  const set = draft.set as string;
+
+  // Get sideboard cards with stats
+  const sideboardResult = await db.execute({
+    sql: `SELECT dc.card_name, dc.quantity, cs.game_in_hand_wr, cs.avg_pick_at
+          FROM decklist_cards dc
+          LEFT JOIN card_stats cs ON dc.card_name = cs.card_name AND cs."set" = ?
+          WHERE dc.draft_id = ? AND dc.is_maindeck = 0
+          ORDER BY cs.game_in_hand_wr DESC NULLS LAST`,
+    args: [set, draftId],
+  });
+
+  const sideboardAnalysis = sideboardResult.rows.map((r) => {
+    const gihWr = r.game_in_hand_wr as number | null;
+    let assessment = "No stats available";
+
+    if (gihWr !== null) {
+      if (gihWr >= 0.58) {
+        assessment = `High GIH WR (${(gihWr * 100).toFixed(1)}%) - consider playing`;
+      } else if (gihWr >= 0.54) {
+        assessment = `Above average GIH WR (${(gihWr * 100).toFixed(1)}%)`;
+      } else if (gihWr >= 0.5) {
+        assessment = `Average GIH WR (${(gihWr * 100).toFixed(1)}%)`;
+      } else {
+        assessment = `Below average GIH WR (${(gihWr * 100).toFixed(1)}%)`;
+      }
+    }
+
+    return {
+      name: r.card_name as string,
+      quantity: r.quantity as number,
+      gih_wr: gihWr,
+      avg_taken_at: r.avg_pick_at as number | null,
+      assessment,
+    };
+  });
+
+  return {
+    draft_id: draftId,
+    wins: draft.wins as number,
+    losses: draft.losses as number,
+    sideboard_analysis: sideboardAnalysis,
+  };
 }
