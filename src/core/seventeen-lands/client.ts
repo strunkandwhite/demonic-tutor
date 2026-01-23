@@ -12,6 +12,30 @@ import type {
 const BASE_URL = "https://www.17lands.com";
 const SESSION_FILE = ".seventeen-lands-session.json";
 
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (attempt < maxRetries) {
+        const delay = delayMs * Math.pow(2, attempt - 1); // Exponential backoff
+        console.log(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 export class SeventeenLandsClient {
   private email: string;
   private password: string;
@@ -98,26 +122,53 @@ export class SeventeenLandsClient {
     writeFileSync(SESSION_FILE, JSON.stringify(sessionData, null, 2));
   }
 
-  private async fetchApi<T>(path: string): Promise<T> {
+  private async fetchApi<T>(path: string, retryCount: number = 0): Promise<T> {
     const page = await this.ensureBrowser();
 
-    // Execute fetch inside the browser context
-    const result = await page.evaluate(async (url: string) => {
-      const response = await fetch(url, {
-        credentials: "include",
-        headers: {
-          "accept": "application/json, text/plain, */*",
-        },
-      });
+    try {
+      const result = await page.evaluate(async (url: string) => {
+        const response = await fetch(url, {
+          credentials: "include",
+          headers: {
+            "accept": "application/json, text/plain, */*",
+          },
+        });
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(`AUTH_ERROR:${response.status}`);
+        }
+
+        if (response.status === 429) {
+          throw new Error("RATE_LIMITED");
+        }
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        return response.json();
+      }, `${BASE_URL}${path}`);
+
+      return result as T;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      // Handle auth errors - try re-login once
+      if (message.includes("AUTH_ERROR") && retryCount === 0) {
+        console.log("Session expired, re-authenticating...");
+        await this.login();
+        return this.fetchApi<T>(path, retryCount + 1);
       }
 
-      return response.json();
-    }, `${BASE_URL}${path}`);
+      // Handle rate limiting
+      if (message === "RATE_LIMITED") {
+        console.log("Rate limited, waiting 30 seconds...");
+        await new Promise((r) => setTimeout(r, 30000));
+        return this.fetchApi<T>(path, retryCount);
+      }
 
-    return result as T;
+      throw error;
+    }
   }
 
   async getUserData(startDate: string, endDate: string): Promise<SeventeenLandsUserData> {
@@ -125,12 +176,12 @@ export class SeventeenLandsClient {
       start_date: startDate,
       end_date: endDate,
     });
-    return this.fetchApi<SeventeenLandsUserData>(`/user/data?${params}`);
+    return withRetry(() => this.fetchApi<SeventeenLandsUserData>(`/user/data?${params}`));
   }
 
   async getDraftDetail(draftId: string): Promise<SeventeenLandsDraftDetail> {
     const params = new URLSearchParams({ draft_id: draftId });
-    return this.fetchApi<SeventeenLandsDraftDetail>(`/data/draft?${params}`);
+    return withRetry(() => this.fetchApi<SeventeenLandsDraftDetail>(`/data/draft?${params}`));
   }
 
   async close(): Promise<void> {
