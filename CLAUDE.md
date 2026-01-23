@@ -53,9 +53,23 @@ src/
 
 **Note:** The column `set` is a SQL reserved word and must be quoted as `"set"` in all SQL statements.
 
+## Sync System
+
+The sync system uses Playwright to authenticate with 17lands and bypass WAF protection.
+
+- Session persists to `.seventeen-lands-session.json` (gitignored)
+- First sync starts from 2026-01-06
+- Subsequent syncs query from last sync date (inclusive)
+- 2 second delay between API calls to avoid rate limiting
+- `--dry-run` flag shows what would sync without writing to DB
+
+**Tables:**
+- `sync_metadata` - Key-value store for sync state (last_sync_date)
+
 ## Environment Variables
 
-- `SEVENTEEN_LANDS_SESSION` - Session cookie from 17lands (get from browser dev tools)
+- `SEVENTEEN_LANDS_EMAIL` - Your 17lands account email
+- `SEVENTEEN_LANDS_PASSWORD` - Your 17lands account password
 - `TURSO_DATABASE_URL` - Turso database URL
 - `TURSO_AUTH_TOKEN` - Turso auth token
 - `OPENAI_API_KEY` - OpenAI API key
