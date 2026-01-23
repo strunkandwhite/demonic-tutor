@@ -93,3 +93,34 @@ export interface SeventeenLandsEventDetails {
     match_results: SeventeenLandsMatchResult[];
   };
 }
+
+export interface SeventeenLandsDeckCard {
+  id: number;
+  name: string;
+  cmc: number;
+  color_identity: string[];
+  mana_cost: string;
+  image_url: string;
+  rarity: string;
+  types: string[];
+}
+
+export interface SeventeenLandsDeckEventInfo {
+  id: string;
+  expansion: string;
+  format: string;
+  wins: number;
+  losses: number;
+  deck_links: string[];
+}
+
+export interface SeventeenLandsDeck {
+  groups: Array<{
+    name: "Maindeck" | "Sideboard";
+    cards: number[];
+  }>;
+  cards: Record<string, SeventeenLandsDeckCard>;
+  main_colors: string;
+  splash_colors: string;
+  event_info: SeventeenLandsDeckEventInfo;
+}
