@@ -9,6 +9,7 @@ import { createSeventeenLandsClient } from "../core/seventeen-lands";
 import type { SeventeenLandsDraftDetail } from "../core/seventeen-lands";
 import { getSyncMetadata, setSyncMetadata } from "../core/db/queries";
 import { augmentCards } from "../augment";
+import { syncDecklists } from "./decklists";
 
 const INITIAL_START_DATE = "2026-01-06";
 
@@ -283,6 +284,11 @@ async function sync() {
     // Augment cards from Scryfall
     if (!dryRun) {
       await augmentCards();
+    }
+
+    // Sync decklists from 17lands
+    if (!dryRun) {
+      await syncDecklists();
     }
 
     // Update last sync date after successful sync
