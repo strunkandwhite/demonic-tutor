@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sync": "tsx src/sync/index.ts",
+    "augment-cards": "tsx src/augment/index.ts",
     "db:migrate": "tsx src/core/db/migrate.ts",
     "predev": "pnpm sync",
     "prebuild": "pnpm sync"
