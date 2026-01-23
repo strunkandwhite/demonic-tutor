@@ -42,6 +42,11 @@ export interface CardStats {
   updated_at: string;
 }
 
+export interface SyncMetadata {
+  key: string;
+  value: string;
+}
+
 /** SQL statements to create tables */
 export const CREATE_TABLES_SQL = `
 CREATE TABLE IF NOT EXISTS drafts (
@@ -84,6 +89,11 @@ CREATE TABLE IF NOT EXISTS card_stats (
   times_picked INTEGER,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (card_name, "set")
+);
+
+CREATE TABLE IF NOT EXISTS sync_metadata (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_drafts_set ON drafts("set");
