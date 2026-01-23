@@ -8,3 +8,4 @@ node_modules
 api_info
 tsconfig.tsbuildinfo
 .claude
+.seventeen-lands-session.json
