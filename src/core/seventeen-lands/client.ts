@@ -7,6 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import type {
   SeventeenLandsUserData,
   SeventeenLandsDraftDetail,
+  SeventeenLandsGameList,
 } from "./types";
 
 const BASE_URL = "https://www.17lands.com";
@@ -182,6 +183,10 @@ export class SeventeenLandsClient {
   async getDraftDetail(draftId: string): Promise<SeventeenLandsDraftDetail> {
     const params = new URLSearchParams({ draft_id: draftId });
     return withRetry(() => this.fetchApi<SeventeenLandsDraftDetail>(`/data/draft?${params}`));
+  }
+
+  async getGames(): Promise<SeventeenLandsGameList> {
+    return withRetry(() => this.fetchApi<SeventeenLandsGameList>("/data/user_game_list"));
   }
 
   async close(): Promise<void> {

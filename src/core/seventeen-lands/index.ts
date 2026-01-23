@@ -1,2 +1,7 @@
 export { SeventeenLandsClient, createSeventeenLandsClient } from "./client";
-export type * from "./types";
+export type {
+  SeventeenLandsUserData,
+  SeventeenLandsDraftDetail,
+  SeventeenLandsGame,
+  SeventeenLandsGameList,
+} from "./types";
