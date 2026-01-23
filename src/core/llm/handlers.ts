@@ -9,6 +9,9 @@ import {
   getMyCardHistory,
   getCardStats,
   getFormatTopCards,
+  getDeck,
+  searchDecks,
+  analyzeDeckChoices,
 } from "../db/queries";
 import type { ToolName } from "./tools";
 
@@ -38,6 +41,22 @@ export async function executeToolCall(
       return JSON.stringify(
         await getFormatTopCards(args.set as string, args.limit as number | undefined)
       );
+
+    case "get_deck":
+      return JSON.stringify(await getDeck(args.draft_id as string));
+
+    case "search_decks":
+      return JSON.stringify(
+        await searchDecks({
+          card_name: args.card_name as string,
+          in_maindeck: args.in_maindeck as boolean | undefined,
+          set: args.set as string | undefined,
+          min_wins: args.min_wins as number | undefined,
+        })
+      );
+
+    case "analyze_deck_choices":
+      return JSON.stringify(await analyzeDeckChoices(args.draft_id as string));
 
     default:
       throw new Error(`Unknown tool: ${name}`);
