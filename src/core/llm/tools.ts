@@ -92,6 +92,52 @@ export const tools: OpenAI.Responses.Tool[] = [
     },
     strict: false,
   },
+  {
+    type: "function",
+    name: "get_deck",
+    description:
+      "Get the decklist for a draft, including maindeck and sideboard with full card details",
+    parameters: {
+      type: "object",
+      properties: {
+        draft_id: { type: "string", description: "Draft ID" },
+      },
+      required: ["draft_id"],
+    },
+    strict: false,
+  },
+  {
+    type: "function",
+    name: "search_decks",
+    description: "Find drafts where a card was in maindeck or sideboard",
+    parameters: {
+      type: "object",
+      properties: {
+        card_name: { type: "string", description: "Card name to search for" },
+        in_maindeck: {
+          type: "boolean",
+          description: "Filter to maindeck only (true) or sideboard only (false)",
+        },
+        set: { type: "string", description: "Filter by set code" },
+        min_wins: { type: "integer", description: "Minimum wins" },
+      },
+      required: ["card_name"],
+    },
+    strict: false,
+  },
+  {
+    type: "function",
+    name: "analyze_deck_choices",
+    description: "Get sideboard cards with their 17lands stats to identify potentially wrong cuts",
+    parameters: {
+      type: "object",
+      properties: {
+        draft_id: { type: "string", description: "Draft ID" },
+      },
+      required: ["draft_id"],
+    },
+    strict: false,
+  },
 ];
 
 export type ToolName =
@@ -100,7 +146,10 @@ export type ToolName =
   | "get_my_stats"
   | "get_my_card_history"
   | "get_card_stats"
-  | "get_format_top_cards";
+  | "get_format_top_cards"
+  | "get_deck"
+  | "search_decks"
+  | "analyze_deck_choices";
 
 export function isValidToolName(name: string): name is ToolName {
   return [
@@ -110,5 +159,8 @@ export function isValidToolName(name: string): name is ToolName {
     "get_my_card_history",
     "get_card_stats",
     "get_format_top_cards",
+    "get_deck",
+    "search_decks",
+    "analyze_deck_choices",
   ].includes(name);
 }
