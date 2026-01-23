@@ -31,7 +31,7 @@ export class SeventeenLandsClient {
       throw new Error(`17lands API error: ${response.status} ${response.statusText}`);
     }
 
-    return response.json() as Promise<T>;
+    return response.json();
   }
 
   async getUserData(): Promise<SeventeenLandsUserData> {
@@ -39,7 +39,8 @@ export class SeventeenLandsClient {
   }
 
   async getDraftDetail(draftId: string): Promise<SeventeenLandsDraftDetail> {
-    return this.fetch<SeventeenLandsDraftDetail>(`/data/draft?draft_id=${draftId}`);
+    const params = new URLSearchParams({ draft_id: draftId });
+    return this.fetch<SeventeenLandsDraftDetail>(`/data/draft?${params}`);
   }
 }
 
