@@ -4,6 +4,13 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+type ModelId = "gpt-4o-mini" | "gpt-5.2-2025-12-11";
+
+const MODELS: { id: ModelId; label: string }[] = [
+  { id: "gpt-5.2-2025-12-11", label: "GPT-5.2" },
+  { id: "gpt-4o-mini", label: "GPT-4o Mini" },
+];
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -20,6 +27,7 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [model, setModel] = useState<ModelId>("gpt-5.2-2025-12-11");
 
   // Refs for auto-scrolling and textarea auto-resize
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -66,7 +74,7 @@ export function Chat() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmedInput }),
+        body: JSON.stringify({ message: trimmedInput, model }),
       });
 
       const data = await response.json();
@@ -87,7 +95,7 @@ export function Chat() {
     } finally {
       setLoading(false);
     }
-  }, [input, loading]);
+  }, [input, loading, model]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -116,8 +124,19 @@ export function Chat() {
   return (
     <div className="flex h-[400px] flex-col rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
       {/* Header */}
-      <div className="border-b border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-800">
+      <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-800">
         <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Ask about your drafts</h2>
+        <select
+          value={model}
+          onChange={(e) => setModel(e.target.value as ModelId)}
+          className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-200 dark:focus:ring-zinc-500"
+        >
+          {MODELS.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Messages area */}

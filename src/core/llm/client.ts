@@ -15,20 +15,25 @@ When answering questions:
 - If the user asks about their performance, include relevant statistics
 - Compare their picks/performance to format averages when relevant`;
 
+export const AVAILABLE_MODELS = ["gpt-5.2-2025-12-11", "gpt-4o-mini"] as const;
+export type ModelId = (typeof AVAILABLE_MODELS)[number];
+
 export interface ChatResult {
   text: string;
   responseId: string;
   model: string;
 }
 
-export async function chat(message: string): Promise<ChatResult> {
+export async function chat(
+  message: string,
+  model: ModelId = "gpt-5.2-2025-12-11"
+): Promise<ChatResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY environment variable is not set");
   }
 
   const openai = new OpenAI({ apiKey });
-  const model = "gpt-4o";
 
   const response = await openai.responses.create({
     model,

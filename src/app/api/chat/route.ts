@@ -3,10 +3,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { chat } from "@/core/llm";
+import { chat, AVAILABLE_MODELS, type ModelId } from "@/core/llm";
 
 interface ChatRequest {
   message: string;
+  model?: ModelId;
 }
 
 interface ChatResponse {
@@ -29,7 +30,11 @@ export async function POST(
       return NextResponse.json({ error: "Missing or invalid 'message' field" }, { status: 400 });
     }
 
-    const result = await chat(body.message);
+    // Validate model if provided
+    const model: ModelId =
+      body.model && AVAILABLE_MODELS.includes(body.model) ? body.model : "gpt-5.2-2025-12-11";
+
+    const result = await chat(body.message, model);
 
     return NextResponse.json({
       text: result.text,
