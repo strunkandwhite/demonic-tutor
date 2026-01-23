@@ -226,3 +226,20 @@ export async function getMyCardHistory(
     drafts,
   };
 }
+
+export async function getSyncMetadata(key: string): Promise<string | null> {
+  const db = await getClient();
+  const result = await db.execute({
+    sql: "SELECT value FROM sync_metadata WHERE key = ?",
+    args: [key],
+  });
+  return (result.rows[0]?.value as string) ?? null;
+}
+
+export async function setSyncMetadata(key: string, value: string): Promise<void> {
+  const db = await getClient();
+  await db.execute({
+    sql: "INSERT OR REPLACE INTO sync_metadata (key, value) VALUES (?, ?)",
+    args: [key, value],
+  });
+}
