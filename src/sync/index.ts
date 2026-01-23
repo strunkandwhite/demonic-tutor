@@ -7,12 +7,33 @@ config({ path: ".env.local", quiet: true });
 import { getClient, closeClient } from "../core/db/client";
 import { createSeventeenLandsClient } from "../core/seventeen-lands";
 import type { SeventeenLandsDraftDetail } from "../core/seventeen-lands";
+import { getSyncMetadata, setSyncMetadata } from "../core/db/queries";
+
+const INITIAL_START_DATE = "2026-01-06";
+
+function getDateRange(lastSyncDate: string | null): { startDate: string; endDate: string } {
+  const start = lastSyncDate || INITIAL_START_DATE;
+
+  // End date is tomorrow to catch any timezone edge cases
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const end = tomorrow.toISOString().split("T")[0];
+
+  return {
+    startDate: `${start}T00:00:00Z`,
+    endDate: `${end}T23:59:59Z`,
+  };
+}
 
 type DbClient = Awaited<ReturnType<typeof getClient>>;
 
 async function sync() {
   const fullSync = process.argv.includes("--full");
+  const dryRun = process.argv.includes("--dry-run");
   console.log(fullSync ? "Running full sync..." : "Running incremental sync...");
+  if (dryRun) {
+    console.log("DRY RUN MODE - no changes will be made");
+  }
 
   const db = await getClient();
   try {
@@ -26,24 +47,37 @@ async function sync() {
         existingDrafts.add(row.id as string);
       }
     } else {
-      // Clear all data for full sync
-      await db.execute("DELETE FROM picks");
-      await db.execute("DELETE FROM card_stats");
-      await db.execute("DELETE FROM drafts");
+      // Clear all data for full sync (unless dry-run)
+      if (!dryRun) {
+        await db.execute("DELETE FROM picks");
+        await db.execute("DELETE FROM card_stats");
+        await db.execute("DELETE FROM drafts");
+        await setSyncMetadata("last_sync_date", "");
+      }
     }
 
-    // Fetch user data from 17lands
-    // Query last 2 years of data (API requires date range)
-    const endDate = new Date().toISOString().split("T")[0];
-    const startDate = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
-    const userData = await api.getUserData(startDate, endDate);
+    // Fetch user data from 17lands using incremental date tracking
+    const lastSyncDate = fullSync ? null : await getSyncMetadata("last_sync_date");
+    const { startDate, endDate } = getDateRange(lastSyncDate);
+    console.log(`Querying drafts from ${startDate} to ${endDate}`);
+
+    const userData = await api.getUserData(startDate.split("T")[0], endDate.split("T")[0]);
     const draftsToSync = userData.drafts.filter(
       (d) => d.has_picks && !existingDrafts.has(d.id)
     );
 
     console.log(`Found ${draftsToSync.length} new drafts to sync`);
+
+    // In dry-run mode, print what would sync and exit early
+    if (dryRun) {
+      console.log("Drafts that would be synced:");
+      for (const draft of draftsToSync) {
+        console.log(`  - ${draft.id} (${draft.expansion}, ${draft.wins}-${draft.losses})`);
+      }
+      console.log("DRY RUN complete - no changes made");
+      await api.close();
+      return;
+    }
 
     const syncedSets: Record<string, number> = {};
 
@@ -87,6 +121,11 @@ async function sync() {
       .map(([set, count]) => `${set}: ${count}`)
       .join(", ");
     console.log(`Synced ${draftsToSync.length} drafts (${summary || "none"})`);
+
+    // Update last sync date after successful sync
+    const today = new Date().toISOString().split("T")[0];
+    await setSyncMetadata("last_sync_date", today);
+    console.log(`Updated last_sync_date to ${today}`);
 
     await api.close();
   } finally {
