@@ -47,6 +47,17 @@ export interface SyncMetadata {
   value: string;
 }
 
+export interface Game {
+  id: string;
+  draft_id: string | null;
+  game_number: number;
+  game_time: string;
+  on_play: number;
+  won: number;
+  turns: number | null;
+  event_name: string | null;
+}
+
 /** SQL statements to create tables */
 export const CREATE_TABLES_SQL = `
 CREATE TABLE IF NOT EXISTS drafts (
@@ -96,8 +107,20 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
   value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS games (
+  id TEXT PRIMARY KEY,
+  draft_id TEXT REFERENCES drafts(id),
+  game_number INTEGER NOT NULL,
+  game_time TEXT NOT NULL,
+  on_play INTEGER NOT NULL,
+  won INTEGER NOT NULL,
+  turns INTEGER,
+  event_name TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_drafts_set ON drafts("set");
 CREATE INDEX IF NOT EXISTS idx_drafts_date ON drafts(draft_date);
 CREATE INDEX IF NOT EXISTS idx_picks_draft ON picks(draft_id);
 CREATE INDEX IF NOT EXISTS idx_card_stats_set ON card_stats("set");
+CREATE INDEX IF NOT EXISTS idx_games_draft ON games(draft_id);
 `;
