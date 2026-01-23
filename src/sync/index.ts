@@ -7,83 +7,87 @@ import { getClient, closeClient } from "../core/db/client";
 import { createSeventeenLandsClient } from "../core/seventeen-lands";
 import type { SeventeenLandsDraftDetail } from "../core/seventeen-lands";
 
+type DbClient = Awaited<ReturnType<typeof getClient>>;
+
 async function sync() {
   const fullSync = process.argv.includes("--full");
   console.log(fullSync ? "Running full sync..." : "Running incremental sync...");
 
   const db = await getClient();
-  const api = createSeventeenLandsClient();
+  try {
+    const api = createSeventeenLandsClient();
 
-  // Get existing draft IDs
-  const existingDrafts = new Set<string>();
-  if (!fullSync) {
-    const result = await db.execute("SELECT id FROM drafts");
-    for (const row of result.rows) {
-      existingDrafts.add(row.id as string);
+    // Get existing draft IDs
+    const existingDrafts = new Set<string>();
+    if (!fullSync) {
+      const result = await db.execute("SELECT id FROM drafts");
+      for (const row of result.rows) {
+        existingDrafts.add(row.id as string);
+      }
+    } else {
+      // Clear all data for full sync
+      await db.execute("DELETE FROM picks");
+      await db.execute("DELETE FROM card_stats");
+      await db.execute("DELETE FROM drafts");
     }
-  } else {
-    // Clear all data for full sync
-    await db.execute("DELETE FROM picks");
-    await db.execute("DELETE FROM card_stats");
-    await db.execute("DELETE FROM drafts");
+
+    // Fetch user data from 17lands
+    const userData = await api.getUserData();
+    const draftsToSync = userData.drafts.filter(
+      (d) => d.has_picks && !existingDrafts.has(d.id)
+    );
+
+    console.log(`Found ${draftsToSync.length} new drafts to sync`);
+
+    const syncedSets: Record<string, number> = {};
+
+    for (const draft of draftsToSync) {
+      console.log(`Syncing draft ${draft.id} (${draft.expansion})...`);
+
+      // Fetch draft details
+      const detail = await api.getDraftDetail(draft.id);
+
+      // Insert draft
+      await db.execute({
+        sql: `INSERT INTO drafts (id, set, format, colors, wins, losses, start_rank, end_rank, draft_date, synced_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          draft.id,
+          draft.expansion,
+          draft.format,
+          draft.colors,
+          draft.wins,
+          draft.losses,
+          draft.start_rank,
+          draft.end_rank,
+          draft.first_pick_time,
+          new Date().toISOString(),
+        ],
+      });
+
+      // Insert picks and cards
+      await insertPicksAndCards(db, draft.id, detail);
+
+      // Update card stats
+      await updateCardStats(db, draft.expansion, detail);
+
+      syncedSets[draft.expansion] = (syncedSets[draft.expansion] || 0) + 1;
+
+      // Rate limiting - be nice to 17lands
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
+    const summary = Object.entries(syncedSets)
+      .map(([set, count]) => `${set}: ${count}`)
+      .join(", ");
+    console.log(`Synced ${draftsToSync.length} drafts (${summary || "none"})`);
+  } finally {
+    closeClient();
   }
-
-  // Fetch user data from 17lands
-  const userData = await api.getUserData();
-  const draftsToSync = userData.drafts.filter(
-    (d) => d.has_picks && !existingDrafts.has(d.id)
-  );
-
-  console.log(`Found ${draftsToSync.length} new drafts to sync`);
-
-  const syncedSets: Record<string, number> = {};
-
-  for (const draft of draftsToSync) {
-    console.log(`Syncing draft ${draft.id} (${draft.expansion})...`);
-
-    // Fetch draft details
-    const detail = await api.getDraftDetail(draft.id);
-
-    // Insert draft
-    await db.execute({
-      sql: `INSERT INTO drafts (id, set, format, colors, wins, losses, start_rank, end_rank, draft_date, synced_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        draft.id,
-        draft.expansion,
-        draft.format,
-        draft.colors,
-        draft.wins,
-        draft.losses,
-        draft.start_rank,
-        draft.end_rank,
-        draft.first_pick_time,
-        new Date().toISOString(),
-      ],
-    });
-
-    // Insert picks and cards
-    await insertPicksAndCards(db, draft.id, detail);
-
-    // Update card stats
-    await updateCardStats(db, draft.expansion, detail);
-
-    syncedSets[draft.expansion] = (syncedSets[draft.expansion] || 0) + 1;
-
-    // Rate limiting - be nice to 17lands
-    await new Promise((r) => setTimeout(r, 500));
-  }
-
-  const summary = Object.entries(syncedSets)
-    .map(([set, count]) => `${set}: ${count}`)
-    .join(", ");
-  console.log(`Synced ${draftsToSync.length} drafts (${summary || "none"})`);
-
-  closeClient();
 }
 
 async function insertPicksAndCards(
-  db: Awaited<ReturnType<typeof getClient>>,
+  db: DbClient,
   draftId: string,
   detail: SeventeenLandsDraftDetail
 ) {
@@ -132,7 +136,7 @@ async function insertPicksAndCards(
 }
 
 async function updateCardStats(
-  db: Awaited<ReturnType<typeof getClient>>,
+  db: DbClient,
   set: string,
   detail: SeventeenLandsDraftDetail
 ) {
@@ -165,11 +169,10 @@ async function updateCardStats(
 
 function extractColors(manaCost: string): string {
   const colors = new Set<string>();
-  const matches = manaCost.match(/\{([WUBRG])\}/g);
-  if (matches) {
-    for (const m of matches) {
-      colors.add(m[1]);
-    }
+  const regex = /\{([WUBRG])\}/g;
+  let match;
+  while ((match = regex.exec(manaCost)) !== null) {
+    colors.add(match[1]);
   }
   return Array.from(colors).sort().join("");
 }
