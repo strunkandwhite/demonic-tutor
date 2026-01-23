@@ -22,8 +22,14 @@ export class SeventeenLandsClient {
   private async fetch<T>(path: string): Promise<T> {
     const response = await fetch(`${BASE_URL}${path}`, {
       headers: {
-        cookie: `session=${this.session}`,
-        accept: "application/json",
+        "cookie": `logged_in=true; session=${this.session}`,
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "en-US,en;q=0.9",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "referer": "https://www.17lands.com/",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
       },
     });
 

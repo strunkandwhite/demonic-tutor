@@ -75,7 +75,7 @@ async function sync() {
       syncedSets[draft.expansion] = (syncedSets[draft.expansion] || 0) + 1;
 
       // Rate limiting - be nice to 17lands
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 1500));
     }
 
     const summary = Object.entries(syncedSets)
