@@ -2,7 +2,8 @@
  * Run database migrations.
  */
 
-import "dotenv/config";
+import { config } from "dotenv";
+config({ path: ".env.local", quiet: true });
 import { getClient, closeClient } from "./client";
 import { CREATE_TABLES_SQL } from "./schema";
 

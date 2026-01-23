@@ -46,7 +46,7 @@ export interface CardStats {
 export const CREATE_TABLES_SQL = `
 CREATE TABLE IF NOT EXISTS drafts (
   id TEXT PRIMARY KEY,
-  set TEXT NOT NULL,
+  "set" TEXT NOT NULL,
   format TEXT NOT NULL,
   colors TEXT,
   wins INTEGER NOT NULL,
@@ -76,18 +76,18 @@ CREATE TABLE IF NOT EXISTS cards (
 
 CREATE TABLE IF NOT EXISTS card_stats (
   card_name TEXT NOT NULL REFERENCES cards(name),
-  set TEXT NOT NULL,
+  "set" TEXT NOT NULL,
   avg_seen_at REAL,
   avg_pick_at REAL,
   game_in_hand_wr REAL,
   times_seen INTEGER,
   times_picked INTEGER,
   updated_at TEXT NOT NULL,
-  PRIMARY KEY (card_name, set)
+  PRIMARY KEY (card_name, "set")
 );
 
-CREATE INDEX IF NOT EXISTS idx_drafts_set ON drafts(set);
+CREATE INDEX IF NOT EXISTS idx_drafts_set ON drafts("set");
 CREATE INDEX IF NOT EXISTS idx_drafts_date ON drafts(draft_date);
 CREATE INDEX IF NOT EXISTS idx_picks_draft ON picks(draft_id);
-CREATE INDEX IF NOT EXISTS idx_card_stats_set ON card_stats(set);
+CREATE INDEX IF NOT EXISTS idx_card_stats_set ON card_stats("set");
 `;

@@ -2,7 +2,8 @@
  * Sync drafts from 17lands to local database.
  */
 
-import "dotenv/config";
+import { config } from "dotenv";
+config({ path: ".env.local", quiet: true });
 import { getClient, closeClient } from "../core/db/client";
 import { createSeventeenLandsClient } from "../core/seventeen-lands";
 import type { SeventeenLandsDraftDetail } from "../core/seventeen-lands";
@@ -49,7 +50,7 @@ async function sync() {
 
       // Insert draft
       await db.execute({
-        sql: `INSERT INTO drafts (id, set, format, colors, wins, losses, start_rank, end_rank, draft_date, synced_at)
+        sql: `INSERT INTO drafts (id, "set", format, colors, wins, losses, start_rank, end_rank, draft_date, synced_at)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           draft.id,
@@ -151,7 +152,7 @@ async function updateCardStats(
 
     await db.execute({
       sql: `INSERT OR REPLACE INTO card_stats
-            (card_name, set, avg_seen_at, avg_pick_at, game_in_hand_wr, times_seen, times_picked, updated_at)
+            (card_name, "set", avg_seen_at, avg_pick_at, game_in_hand_wr, times_seen, times_picked, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         cardName,

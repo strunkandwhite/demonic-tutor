@@ -20,7 +20,7 @@ export async function listDrafts(params: ListDraftsParams): Promise<Draft[]> {
   const args: (string | number)[] = [];
 
   if (params.set) {
-    conditions.push("set = ?");
+    conditions.push('"set" = ?');
     args.push(params.set);
   }
   if (params.colors) {
@@ -96,7 +96,7 @@ export async function getMyStats(params: MyStatsParams): Promise<MyStats> {
   const args: (string | number)[] = [];
 
   if (params.set) {
-    conditions.push("set = ?");
+    conditions.push('"set" = ?');
     args.push(params.set);
   }
   if (params.colors) {
@@ -164,7 +164,7 @@ export async function getCardStats(
 ): Promise<CardStats | null> {
   const db = await getClient();
   const result = await db.execute({
-    sql: "SELECT * FROM card_stats WHERE card_name = ? AND set = ?",
+    sql: 'SELECT * FROM card_stats WHERE card_name = ? AND "set" = ?',
     args: [cardName, set],
   });
   return (result.rows[0] as unknown as CardStats) || null;
@@ -177,7 +177,7 @@ export async function getFormatTopCards(
   const db = await getClient();
   const result = await db.execute({
     sql: `SELECT * FROM card_stats
-          WHERE set = ? AND game_in_hand_wr IS NOT NULL
+          WHERE "set" = ? AND game_in_hand_wr IS NOT NULL
           ORDER BY game_in_hand_wr DESC
           LIMIT ?`,
     args: [set, limit],
@@ -195,7 +195,7 @@ export async function getMyCardHistory(
   drafts: Array<{ draft_id: string; pack: number; pick: number; wins: number; losses: number }>;
 }> {
   const db = await getClient();
-  const setCondition = set ? "AND d.set = ?" : "";
+  const setCondition = set ? 'AND d."set" = ?' : "";
   const args = set ? [cardName, set] : [cardName];
 
   const result = await db.execute({
