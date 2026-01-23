@@ -26,7 +26,7 @@ function getDateRange(lastSyncDate: string | null): { startDate: string; endDate
   };
 }
 
-function parseGameLink(link: string): { draftId: string; gameNumber: number } | null {
+export function parseGameLink(link: string): { draftId: string; gameNumber: number } | null {
   // Link format: /user/game_replay/{date}/{draft_id}/{game_number}
   const match = link.match(/\/user\/game_replay\/\d+\/([a-f0-9]+)\/(\d+)/);
   if (!match) return null;
@@ -58,7 +58,10 @@ async function syncGames(
 
   const newGames = games.filter((game) => {
     const parsed = parseGameLink(game.link);
-    if (!parsed) return false;
+    if (!parsed) {
+      console.warn(`Could not parse game link: ${game.link}`);
+      return false;
+    }
     const id = `${parsed.draftId}_${parsed.gameNumber}`;
     return !existingGames.has(id);
   });
@@ -105,7 +108,7 @@ async function syncGames(
   console.log(`Synced ${inserted} games`);
 }
 
-function parseGameIdFromS3Path(s3Path: string): string | null {
+export function parseGameIdFromS3Path(s3Path: string): string | null {
   // s3://17lands-game-histories/20260122/{game_id}.json.gz
   const match = s3Path.match(/\/([a-f0-9]+)\.json\.gz$/);
   return match ? match[1] : null;
@@ -128,9 +131,9 @@ async function linkGamesToDrafts(
 
   console.log(`Linking ${unlinkedCount} unlinked games to drafts...`);
 
-  // Get unlinked game IDs for matching
+  // Get unlinked game IDs for matching (extract ID before underscore)
   const gamesResult = await db.execute(
-    "SELECT DISTINCT SUBSTR(id, 1, 32) as game_id FROM games WHERE draft_id IS NULL"
+    "SELECT DISTINCT SUBSTR(id, 1, INSTR(id, '_') - 1) as game_id FROM games WHERE draft_id IS NULL"
   );
   const unlinkedGameIds = new Set(
     gamesResult.rows.map((r) => r.game_id as string)
@@ -257,8 +260,8 @@ async function sync() {
 
       syncedSets[draft.expansion] = (syncedSets[draft.expansion] || 0) + 1;
 
-      // Rate limiting - be nice to 17lands
-      await new Promise((r) => setTimeout(r, 1500));
+      // Rate limiting - be nice to 17lands (2s between requests)
+      await new Promise((r) => setTimeout(r, 2000));
     }
 
     const summary = Object.entries(syncedSets)
