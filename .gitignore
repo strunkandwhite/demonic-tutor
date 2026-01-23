@@ -3,3 +3,6 @@ node_modules
 .env.local
 .env
 *.log
+
+.private-journal
+api_info
