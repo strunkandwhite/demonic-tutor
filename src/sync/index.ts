@@ -33,7 +33,12 @@ async function sync() {
     }
 
     // Fetch user data from 17lands
-    const userData = await api.getUserData();
+    // Query last 2 years of data (API requires date range)
+    const endDate = new Date().toISOString().split("T")[0];
+    const startDate = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
+    const userData = await api.getUserData(startDate, endDate);
     const draftsToSync = userData.drafts.filter(
       (d) => d.has_picks && !existingDrafts.has(d.id)
     );
@@ -82,6 +87,8 @@ async function sync() {
       .map(([set, count]) => `${set}: ${count}`)
       .join(", ");
     console.log(`Synced ${draftsToSync.length} drafts (${summary || "none"})`);
+
+    await api.close();
   } finally {
     closeClient();
   }
