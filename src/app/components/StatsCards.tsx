@@ -5,30 +5,36 @@ export async function StatsCards() {
   try {
     stats = await getMyStats({});
   } catch {
-    return <div className="text-gray-500">Unable to load stats</div>;
+    return (
+      <div className="rounded-lg border border-zinc-200 bg-white p-6 text-center text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+        Unable to load stats
+      </div>
+    );
   }
 
   const winRate = (stats.win_rate * 100).toFixed(1);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div className="bg-white p-4 rounded-lg shadow-sm border">
-        <div className="text-2xl font-bold">{stats.total_drafts}</div>
-        <div className="text-gray-600 text-sm">Drafts</div>
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+          {stats.total_drafts}
+        </div>
+        <div className="text-sm text-zinc-500 dark:text-zinc-400">Drafts</div>
       </div>
-      <div className="bg-white p-4 rounded-lg shadow-sm border">
-        <div className="text-2xl font-bold">{winRate}%</div>
-        <div className="text-gray-600 text-sm">Win Rate</div>
+      <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{winRate}%</div>
+        <div className="text-sm text-zinc-500 dark:text-zinc-400">Win Rate</div>
       </div>
-      <div className="bg-white p-4 rounded-lg shadow-sm border">
-        <div className="text-2xl font-bold">{stats.trophies}</div>
-        <div className="text-gray-600 text-sm">Trophies</div>
+      <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="text-2xl font-bold text-amber-500">{stats.trophies}</div>
+        <div className="text-sm text-zinc-500 dark:text-zinc-400">Trophies</div>
       </div>
-      <div className="bg-white p-4 rounded-lg shadow-sm border">
-        <div className="text-2xl font-bold">
+      <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
           {stats.total_wins}-{stats.total_losses}
         </div>
-        <div className="text-gray-600 text-sm">Record</div>
+        <div className="text-sm text-zinc-500 dark:text-zinc-400">Record</div>
       </div>
     </div>
   );
