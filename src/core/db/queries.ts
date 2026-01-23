@@ -3,7 +3,7 @@
  */
 
 import { getClient } from "./client";
-import type { Draft, Pick, Card, CardStats } from "./schema";
+import type { Draft, Pick, CardStats } from "./schema";
 
 export interface ListDraftsParams {
   set?: string;
@@ -41,10 +41,11 @@ export async function listDrafts(params: ListDraftsParams): Promise<Draft[]> {
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  const limit = params.limit ? `LIMIT ${params.limit}` : "LIMIT 100";
+  const limitValue = params.limit ?? 100;
+  args.push(limitValue);
 
   const result = await db.execute({
-    sql: `SELECT * FROM drafts ${where} ORDER BY draft_date DESC ${limit}`,
+    sql: `SELECT * FROM drafts ${where} ORDER BY draft_date DESC LIMIT ?`,
     args,
   });
 
