@@ -25,7 +25,84 @@ function getDateRange(lastSyncDate: string | null): { startDate: string; endDate
   };
 }
 
+function parseGameLink(link: string): { draftId: string; gameNumber: number } | null {
+  // Link format: /user/game_replay/{date}/{draft_id}/{game_number}
+  const match = link.match(/\/user\/game_replay\/\d+\/([a-f0-9]+)\/(\d+)/);
+  if (!match) return null;
+  return {
+    draftId: match[1],
+    gameNumber: parseInt(match[2], 10),
+  };
+}
+
 type DbClient = Awaited<ReturnType<typeof getClient>>;
+
+async function syncGames(
+  db: DbClient,
+  api: ReturnType<typeof createSeventeenLandsClient>,
+  existingDraftIds: Set<string>,
+  dryRun: boolean
+) {
+  console.log("Syncing games...");
+
+  const gameData = await api.getGames();
+  const games = gameData.games;
+
+  // Get existing game IDs
+  const existingGames = new Set<string>();
+  const result = await db.execute("SELECT id FROM games");
+  for (const row of result.rows) {
+    existingGames.add(row.id as string);
+  }
+
+  const newGames = games.filter((game) => {
+    const parsed = parseGameLink(game.link);
+    if (!parsed) return false;
+    const id = `${parsed.draftId}_${parsed.gameNumber}`;
+    return !existingGames.has(id);
+  });
+
+  console.log(`Found ${newGames.length} new games to sync`);
+
+  if (dryRun) {
+    console.log("Games that would be synced:");
+    for (const game of newGames.slice(0, 10)) {
+      const parsed = parseGameLink(game.link);
+      console.log(`  - ${parsed?.draftId}_${parsed?.gameNumber} (${game.on_play ? "play" : "draw"}, ${game.won ? "won" : "lost"})`);
+    }
+    if (newGames.length > 10) {
+      console.log(`  ... and ${newGames.length - 10} more`);
+    }
+    return;
+  }
+
+  let inserted = 0;
+  for (const game of newGames) {
+    const parsed = parseGameLink(game.link);
+    if (!parsed) continue;
+
+    const id = `${parsed.draftId}_${parsed.gameNumber}`;
+    const draftId = existingDraftIds.has(parsed.draftId) ? parsed.draftId : null;
+
+    await db.execute({
+      sql: `INSERT OR IGNORE INTO games (id, draft_id, game_number, game_time, on_play, won, turns, event_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        id,
+        draftId,
+        parsed.gameNumber,
+        game.game_time,
+        game.on_play ? 1 : 0,
+        game.won ? 1 : 0,
+        game.turns,
+        game.event_name,
+      ],
+    });
+    inserted++;
+  }
+
+  console.log(`Synced ${inserted} games`);
+}
 
 async function sync() {
   const fullSync = process.argv.includes("--full");
@@ -52,6 +129,7 @@ async function sync() {
         await db.execute("DELETE FROM picks");
         await db.execute("DELETE FROM card_stats");
         await db.execute("DELETE FROM drafts");
+        await db.execute("DELETE FROM games");
         await setSyncMetadata("last_sync_date", "");
       }
     }
@@ -121,6 +199,14 @@ async function sync() {
       .map(([set, count]) => `${set}: ${count}`)
       .join(", ");
     console.log(`Synced ${draftsToSync.length} drafts (${summary || "none"})`);
+
+    // Sync games
+    const allDraftIds = new Set<string>();
+    const draftResult = await db.execute("SELECT id FROM drafts");
+    for (const row of draftResult.rows) {
+      allDraftIds.add(row.id as string);
+    }
+    await syncGames(db, api, allDraftIds, dryRun);
 
     // Update last sync date after successful sync
     const today = new Date().toISOString().split("T")[0];
