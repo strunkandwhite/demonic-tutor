@@ -49,3 +49,17 @@ export interface SeventeenLandsDraftDetail {
     game_in_hand_win_rate: number | null;
   }>;
 }
+
+export interface SeventeenLandsGame {
+  account_name: string;
+  event_name: string;
+  game_time: string;
+  link: string;
+  on_play: boolean;
+  turns: number;
+  won: boolean;
+}
+
+export interface SeventeenLandsGameList {
+  games: SeventeenLandsGame[];
+}
