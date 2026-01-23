@@ -63,3 +63,30 @@ export interface SeventeenLandsGame {
 export interface SeventeenLandsGameList {
   games: SeventeenLandsGame[];
 }
+
+export interface SeventeenLandsGameResult {
+  on_play: boolean;
+  won: boolean;
+  game_number: number;
+  mulligans: number;
+  opponent_mulligans: number;
+  completion_time: number;
+  history_s3_path: string; // Contains game ID like "s3://17lands-game-histories/20260122/{game_id}.json.gz"
+}
+
+export interface SeventeenLandsMatchResult {
+  game_results: SeventeenLandsGameResult[];
+}
+
+export interface SeventeenLandsEventDetails {
+  metadata: {
+    id: string;
+    expansion: string;
+    format: string;
+    wins: number;
+    losses: number;
+  };
+  details: {
+    match_results: SeventeenLandsMatchResult[];
+  };
+}

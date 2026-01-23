@@ -105,6 +105,71 @@ async function syncGames(
   console.log(`Synced ${inserted} games`);
 }
 
+function parseGameIdFromS3Path(s3Path: string): string | null {
+  // s3://17lands-game-histories/20260122/{game_id}.json.gz
+  const match = s3Path.match(/\/([a-f0-9]+)\.json\.gz$/);
+  return match ? match[1] : null;
+}
+
+async function linkGamesToDrafts(
+  db: DbClient,
+  api: ReturnType<typeof createSeventeenLandsClient>,
+  draftIds: Set<string>
+) {
+  // Only process if there are unlinked games
+  const unlinkedResult = await db.execute(
+    "SELECT COUNT(*) as count FROM games WHERE draft_id IS NULL"
+  );
+  const unlinkedCount = unlinkedResult.rows[0].count as number;
+
+  if (unlinkedCount === 0) {
+    return;
+  }
+
+  console.log(`Linking ${unlinkedCount} unlinked games to drafts...`);
+
+  // Get unlinked game IDs for matching
+  const gamesResult = await db.execute(
+    "SELECT DISTINCT SUBSTR(id, 1, 32) as game_id FROM games WHERE draft_id IS NULL"
+  );
+  const unlinkedGameIds = new Set(
+    gamesResult.rows.map((r) => r.game_id as string)
+  );
+
+  let updated = 0;
+  for (const draftId of draftIds) {
+    try {
+      const eventDetails = await api.getEventDetails(draftId);
+
+      for (const match of eventDetails.details.match_results) {
+        for (const game of match.game_results) {
+          const gameId = parseGameIdFromS3Path(game.history_s3_path);
+          if (gameId && unlinkedGameIds.has(gameId)) {
+            const result = await db.execute({
+              sql: "UPDATE games SET draft_id = ?, game_number = ? WHERE id LIKE ?",
+              args: [draftId, game.game_number, `${gameId}%`],
+            });
+            if (result.rowsAffected > 0) {
+              updated++;
+              unlinkedGameIds.delete(gameId);
+            }
+          }
+        }
+      }
+
+      // Stop early if all games are linked
+      if (unlinkedGameIds.size === 0) break;
+
+      // Rate limiting
+      await new Promise((r) => setTimeout(r, 500));
+    } catch (err) {
+      console.error(`Failed to get event details for ${draftId}:`, err);
+    }
+  }
+
+  console.log(`Linked ${updated} games to drafts`);
+}
+
 async function sync() {
   const fullSync = process.argv.includes("--full");
   const dryRun = process.argv.includes("--dry-run");
@@ -208,6 +273,11 @@ async function sync() {
       allDraftIds.add(row.id as string);
     }
     await syncGames(db, api, allDraftIds, dryRun);
+
+    // Link games to drafts using event_details
+    if (!dryRun) {
+      await linkGamesToDrafts(db, api, allDraftIds);
+    }
 
     // Augment cards from Scryfall
     if (!dryRun) {

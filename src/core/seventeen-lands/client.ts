@@ -8,6 +8,7 @@ import type {
   SeventeenLandsUserData,
   SeventeenLandsDraftDetail,
   SeventeenLandsGameList,
+  SeventeenLandsEventDetails,
 } from "./types";
 
 const BASE_URL = "https://www.17lands.com";
@@ -187,6 +188,11 @@ export class SeventeenLandsClient {
 
   async getGames(): Promise<SeventeenLandsGameList> {
     return withRetry(() => this.fetchApi<SeventeenLandsGameList>("/data/user_game_list"));
+  }
+
+  async getEventDetails(draftId: string): Promise<SeventeenLandsEventDetails> {
+    const params = new URLSearchParams({ draft_id: draftId });
+    return withRetry(() => this.fetchApi<SeventeenLandsEventDetails>(`/data/event_details?${params}`));
   }
 
   async close(): Promise<void> {

@@ -16,6 +16,7 @@ Personal MTG Arena draft analytics app that syncs data from 17lands and provides
 - **Turso CLI**: `turso` shell is available for database operations
   - `turso db shell demonic-tutor` - interactive SQL shell
   - `turso db show demonic-tutor` - show database info
+  - **NEVER drop tables without express user permission**
 
 ## Key Commands
 

@@ -4,4 +4,5 @@ export type {
   SeventeenLandsDraftDetail,
   SeventeenLandsGame,
   SeventeenLandsGameList,
+  SeventeenLandsEventDetails,
 } from "./types";
