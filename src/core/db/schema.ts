@@ -29,6 +29,10 @@ export interface Card {
   types: string | null;
   mana_cost: string | null;
   colors: string | null;
+  oracle_id: string | null;
+  oracle_text: string | null;
+  cmc: number | null;
+  rarity: string | null;
 }
 
 export interface CardStats {
@@ -87,7 +91,11 @@ CREATE TABLE IF NOT EXISTS cards (
   image_url TEXT,
   types TEXT,
   mana_cost TEXT,
-  colors TEXT
+  colors TEXT,
+  oracle_id TEXT,
+  oracle_text TEXT,
+  cmc REAL,
+  rarity TEXT
 );
 
 CREATE TABLE IF NOT EXISTS card_stats (
