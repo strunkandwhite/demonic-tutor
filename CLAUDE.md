@@ -51,6 +51,8 @@ src/
 - `cards` - Card registry (name, image_url, types, mana_cost, colors)
 - `card_stats` - 17lands stats per card per set (GIH WR, ALSA, ATA)
 
+**Note:** The column `set` is a SQL reserved word and must be quoted as `"set"` in all SQL statements.
+
 ## Environment Variables
 
 - `SEVENTEEN_LANDS_SESSION` - Session cookie from 17lands (get from browser dev tools)
