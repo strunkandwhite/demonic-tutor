@@ -47,8 +47,9 @@ src/
 ## Database Schema
 
 - `drafts` - Draft metadata (id, set, format, colors, wins, losses, ranks)
+- `games` - Game results (draft_id, on_play, won, turns, game_time)
 - `picks` - Individual picks (draft_id, pack_number, pick_number, card_name, available_cards)
-- `cards` - Card registry (name, image_url, types, mana_cost, colors)
+- `cards` - Card registry (name, image_url, types, mana_cost, colors, oracle_id, oracle_text, cmc, rarity)
 - `card_stats` - 17lands stats per card per set (GIH WR, ALSA, ATA)
 
 **Note:** The column `set` is a SQL reserved word and must be quoted as `"set"` in all SQL statements.
@@ -62,6 +63,11 @@ The sync system uses Playwright to authenticate with 17lands and bypass WAF prot
 - Subsequent syncs query from last sync date (inclusive)
 - 2 second delay between API calls to avoid rate limiting
 - `--dry-run` flag shows what would sync without writing to DB
+
+**Sync steps:**
+1. Sync drafts from 17lands (date-range based)
+2. Sync games from 17lands (all games, dedup by ID)
+3. Augment cards from Scryfall (only cards missing oracle_text)
 
 **Tables:**
 - `sync_metadata` - Key-value store for sync state (last_sync_date)
