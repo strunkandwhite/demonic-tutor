@@ -5,4 +5,5 @@ export type {
   SeventeenLandsGame,
   SeventeenLandsGameList,
   SeventeenLandsEventDetails,
+  SeventeenLandsDeck,
 } from "./types";
