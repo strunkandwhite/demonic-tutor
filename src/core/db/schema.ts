@@ -62,6 +62,19 @@ export interface Game {
   event_name: string | null;
 }
 
+export interface Decklist {
+  draft_id: string;
+  main_colors: string | null;
+  splash_colors: string | null;
+}
+
+export interface DecklistCard {
+  draft_id: string;
+  card_name: string;
+  quantity: number;
+  is_maindeck: number;
+}
+
 /** SQL statements to create tables */
 export const CREATE_TABLES_SQL = `
 CREATE TABLE IF NOT EXISTS drafts (
@@ -131,4 +144,21 @@ CREATE INDEX IF NOT EXISTS idx_drafts_date ON drafts(draft_date);
 CREATE INDEX IF NOT EXISTS idx_picks_draft ON picks(draft_id);
 CREATE INDEX IF NOT EXISTS idx_card_stats_set ON card_stats("set");
 CREATE INDEX IF NOT EXISTS idx_games_draft ON games(draft_id);
+
+CREATE TABLE IF NOT EXISTS decklists (
+  draft_id TEXT PRIMARY KEY REFERENCES drafts(id),
+  main_colors TEXT,
+  splash_colors TEXT
+);
+
+CREATE TABLE IF NOT EXISTS decklist_cards (
+  draft_id TEXT REFERENCES decklists(draft_id),
+  card_name TEXT REFERENCES cards(name),
+  quantity INTEGER NOT NULL,
+  is_maindeck INTEGER NOT NULL,
+  PRIMARY KEY (draft_id, card_name, is_maindeck)
+);
+
+CREATE INDEX IF NOT EXISTS idx_decklist_cards_card ON decklist_cards(card_name);
+CREATE INDEX IF NOT EXISTS idx_decklist_cards_draft ON decklist_cards(draft_id);
 `;
