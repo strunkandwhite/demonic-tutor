@@ -13,6 +13,7 @@
 ## Task 1: Add Games Table to Schema
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/src/core/db/schema.ts`
 
 **Step 1: Add Game interface**
@@ -73,6 +74,7 @@ git commit -m "feat(db): add games table for play/draw tracking"
 ## Task 2: Add Card Table Columns
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/src/core/db/schema.ts`
 
 **Step 1: Update Card interface**
@@ -131,6 +133,7 @@ git commit -m "feat(db): expand cards table with oracle_text, cmc, rarity"
 ## Task 3: Add Games Type to 17lands Types
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/src/core/seventeen-lands/types.ts`
 
 **Step 1: Add SeventeenLandsGame type**
@@ -165,6 +168,7 @@ git commit -m "feat(17lands): add game list types"
 ## Task 4: Add getGames Method to Client
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/src/core/seventeen-lands/client.ts`
 
 **Step 1: Import new type**
@@ -218,6 +222,7 @@ git commit -m "feat(17lands): add getGames method for play/draw data"
 ## Task 5: Create Scryfall Augmentation Script
 
 **Files:**
+
 - Create: `/Users/arpanet/code/demonic-tutor/src/augment/index.ts`
 
 **Step 1: Create augment directory and script**
@@ -275,9 +280,7 @@ async function augmentCards() {
   const db = await getClient();
   try {
     // Find cards missing oracle_text
-    const result = await db.execute(
-      "SELECT name FROM cards WHERE oracle_text IS NULL"
-    );
+    const result = await db.execute("SELECT name FROM cards WHERE oracle_text IS NULL");
 
     const cardsToAugment = result.rows.map((r) => r.name as string);
     console.log(`Found ${cardsToAugment.length} cards to augment`);
@@ -366,6 +369,7 @@ git commit -m "feat: add Scryfall card augmentation script"
 ## Task 6: Integrate Games Sync into Main Sync
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/src/sync/index.ts`
 
 **Step 1: Add parseGameLink helper**
@@ -420,7 +424,9 @@ async function syncGames(
     console.log("Games that would be synced:");
     for (const game of newGames.slice(0, 10)) {
       const parsed = parseGameLink(game.link);
-      console.log(`  - ${parsed?.draftId}_${parsed?.gameNumber} (${game.on_play ? "play" : "draw"}, ${game.won ? "won" : "lost"})`);
+      console.log(
+        `  - ${parsed?.draftId}_${parsed?.gameNumber} (${game.on_play ? "play" : "draw"}, ${game.won ? "won" : "lost"})`
+      );
     }
     if (newGames.length > 10) {
       console.log(`  ... and ${newGames.length - 10} more`);
@@ -462,13 +468,13 @@ async function syncGames(
 In the sync() function, after the draft sync loop and before updating last_sync_date (around line 123), add:
 
 ```typescript
-    // Sync games
-    const allDraftIds = new Set<string>();
-    const draftResult = await db.execute("SELECT id FROM drafts");
-    for (const row of draftResult.rows) {
-      allDraftIds.add(row.id as string);
-    }
-    await syncGames(db, api, allDraftIds, dryRun);
+// Sync games
+const allDraftIds = new Set<string>();
+const draftResult = await db.execute("SELECT id FROM drafts");
+for (const row of draftResult.rows) {
+  allDraftIds.add(row.id as string);
+}
+await syncGames(db, api, allDraftIds, dryRun);
 ```
 
 **Step 4: Also clear games on full sync**
@@ -476,7 +482,7 @@ In the sync() function, after the draft sync loop and before updating last_sync_
 In the fullSync block (around line 52), add after the other DELETE statements:
 
 ```typescript
-        await db.execute("DELETE FROM games");
+await db.execute("DELETE FROM games");
 ```
 
 **Step 5: Verify TypeScript compiles**
@@ -495,6 +501,7 @@ git commit -m "feat(sync): add games sync for play/draw tracking"
 ## Task 7: Integrate Scryfall Augmentation into Sync
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/src/sync/index.ts`
 
 **Step 1: Import augmentCards**
@@ -510,10 +517,10 @@ import { augmentCards } from "../augment";
 After the games sync and before `await api.close()` (around line 130), add:
 
 ```typescript
-    // Augment cards from Scryfall
-    if (!dryRun) {
-      await augmentCards();
-    }
+// Augment cards from Scryfall
+if (!dryRun) {
+  await augmentCards();
+}
 ```
 
 **Step 3: Verify sync runs end-to-end**
@@ -533,6 +540,7 @@ git commit -m "feat(sync): integrate Scryfall augmentation into sync flow"
 ## Task 8: Update Documentation
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/CLAUDE.md`
 - Modify: `/Users/arpanet/code/demonic-tutor/README.md`
 
@@ -556,6 +564,7 @@ Add after the existing sync system description:
 
 ```markdown
 **Sync steps:**
+
 1. Sync drafts from 17lands (date-range based)
 2. Sync games from 17lands (all games, dedup by ID)
 3. Augment cards from Scryfall (only cards missing oracle_text)
@@ -585,6 +594,7 @@ git commit -m "docs: update documentation for games and card expansion"
 Run: `pnpm sync`
 
 Expected output should include:
+
 - Drafts sync (may show 0 if already synced)
 - Games sync with count of new games
 - Scryfall augmentation with count of cards

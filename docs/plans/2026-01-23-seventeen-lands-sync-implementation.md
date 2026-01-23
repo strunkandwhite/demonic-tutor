@@ -13,12 +13,14 @@
 ## Task 1: Update .gitignore and Environment
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/.gitignore`
 - Modify: `/Users/arpanet/code/demonic-tutor/.env.local`
 
 **Step 1: Add session file to .gitignore**
 
 Add to `.gitignore`:
+
 ```
 .seventeen-lands-session.json
 ```
@@ -26,6 +28,7 @@ Add to `.gitignore`:
 **Step 2: Update .env.local with new credentials**
 
 Add to `.env.local`:
+
 ```
 SEVENTEEN_LANDS_EMAIL=<user's email>
 SEVENTEEN_LANDS_PASSWORD=<user's password>
@@ -45,6 +48,7 @@ git commit -m "chore: add session file to gitignore"
 ## Task 2: Add sync_metadata Table to Schema
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/src/core/db/schema.ts`
 
 **Step 1: Add sync_metadata table to CREATE_TABLES_SQL**
@@ -86,6 +90,7 @@ git commit -m "feat(db): add sync_metadata table for tracking sync state"
 ## Task 3: Add Sync Metadata Query Functions
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/src/core/db/queries.ts`
 
 **Step 1: Add getSyncMetadata function**
@@ -129,6 +134,7 @@ git commit -m "feat(db): add sync metadata getter and setter"
 ## Task 4: Rewrite SeventeenLandsClient with Playwright
 
 **Files:**
+
 - Rewrite: `/Users/arpanet/code/demonic-tutor/src/core/seventeen-lands/client.ts`
 
 **Step 1: Write the new Playwright-based client**
@@ -142,10 +148,7 @@ Replace entire contents of `client.ts`:
 
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { existsSync, readFileSync, writeFileSync } from "fs";
-import type {
-  SeventeenLandsUserData,
-  SeventeenLandsDraftDetail,
-} from "./types";
+import type { SeventeenLandsUserData, SeventeenLandsDraftDetail } from "./types";
 
 const BASE_URL = "https://www.17lands.com";
 const SESSION_FILE = ".seventeen-lands-session.json";
@@ -244,7 +247,7 @@ export class SeventeenLandsClient {
       const response = await fetch(url, {
         credentials: "include",
         headers: {
-          "accept": "application/json, text/plain, */*",
+          accept: "application/json, text/plain, */*",
         },
       });
 
@@ -318,6 +321,7 @@ git commit -m "feat(17lands): rewrite client with Playwright for WAF bypass"
 ## Task 5: Update Sync Script for Incremental Date Tracking
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/src/sync/index.ts`
 
 **Step 1: Add imports for sync metadata**
@@ -396,15 +400,15 @@ async function sync() {
 
     // Fetch user data from 17lands
     const userData = await api.getUserData(startDate, endDate);
-    const draftsToSync = userData.drafts.filter(
-      (d) => d.has_picks && !existingDrafts.has(d.id)
-    );
+    const draftsToSync = userData.drafts.filter((d) => d.has_picks && !existingDrafts.has(d.id));
 
     console.log(`Found ${draftsToSync.length} new drafts to sync`);
 
     if (dryRun) {
       for (const draft of draftsToSync) {
-        console.log(`  Would sync: ${draft.id} (${draft.expansion}) - ${draft.wins}-${draft.losses}`);
+        console.log(
+          `  Would sync: ${draft.id} (${draft.expansion}) - ${draft.wins}-${draft.losses}`
+        );
       }
       await api.close();
       return;
@@ -481,6 +485,7 @@ git commit -m "feat(sync): add incremental date tracking and dry-run mode"
 ## Task 6: Add Error Handling and Retry Logic
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/src/core/seventeen-lands/client.ts`
 
 **Step 1: Add retry helper function**
@@ -599,6 +604,7 @@ git commit -m "feat(17lands): add retry logic and session expiry handling"
 ## Task 7: Update CLAUDE.md
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/CLAUDE.md`
 
 **Step 1: Update environment variables section**
@@ -631,6 +637,7 @@ The sync system uses Playwright to authenticate with 17lands and bypass WAF prot
 - `--dry-run` flag shows what would sync without writing to DB
 
 **Tables:**
+
 - `sync_metadata` - Key-value store for sync state (last_sync_date)
 ```
 
@@ -646,13 +653,14 @@ git commit -m "docs: update CLAUDE.md with new sync system details"
 ## Task 8: Update README.md
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/README.md`
 
 **Step 1: Update Setup section**
 
 Replace the Setup section:
 
-```markdown
+````markdown
 ## Setup
 
 1. Copy `.env.local.example` to `.env.local` and fill in your credentials:
@@ -666,7 +674,9 @@ Replace the Setup section:
    ```bash
    pnpm exec playwright install chromium
    ```
-```
+````
+
+````
 
 **Step 2: Update Commands section**
 
@@ -681,7 +691,7 @@ Replace the Commands section:
 - `pnpm dev` - Start development server
 - `pnpm build` - Build for production
 - `pnpm test` - Run tests
-```
+````
 
 **Step 3: Commit**
 
@@ -697,6 +707,7 @@ git commit -m "docs: update README with new sync setup instructions"
 **Step 1: Ensure credentials are set**
 
 Verify `.env.local` has:
+
 ```
 SEVENTEEN_LANDS_EMAIL=<your email>
 SEVENTEEN_LANDS_PASSWORD=<your password>
@@ -727,11 +738,13 @@ Expected: Should show number of synced drafts
 ## Task 10: Clean Up Old Session Cookie Code
 
 **Files:**
+
 - Modify: `/Users/arpanet/code/demonic-tutor/.env.local`
 
 **Step 1: Remove old session cookie**
 
 Remove from `.env.local`:
+
 ```
 SEVENTEEN_LANDS_SESSION=...
 ```

@@ -32,6 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_games_draft ON games(draft_id);
 ### Game Link Parsing
 
 The 17lands `/data/user_game_list` endpoint returns games with links like:
+
 ```
 /user/game_replay/20240820/acabda3cc65c45de92b0a08c9f6feeab/0
 ```

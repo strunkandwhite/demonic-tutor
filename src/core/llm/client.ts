@@ -73,9 +73,10 @@ export async function chat(message: string): Promise<ChatResult> {
   }
 
   const textOutput = currentResponse.output.find((o) => o.type === "message");
-  const text = textOutput?.type === "message"
-    ? textOutput.content.map((c) => (c.type === "output_text" ? c.text : "")).join("")
-    : "";
+  const text =
+    textOutput?.type === "message"
+      ? textOutput.content.map((c) => (c.type === "output_text" ? c.text : "")).join("")
+      : "";
 
   return {
     text,

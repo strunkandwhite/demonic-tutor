@@ -133,7 +133,13 @@ export async function getMyStats(params: MyStatsParams): Promise<MyStats> {
   const colorBreakdown: Record<string, { drafts: number; wins: number; losses: number }> = {};
 
   for (const row of result.rows) {
-    const r = row as unknown as { total_drafts: number; total_wins: number; total_losses: number; trophies: number; colors: string };
+    const r = row as unknown as {
+      total_drafts: number;
+      total_wins: number;
+      total_losses: number;
+      trophies: number;
+      colors: string;
+    };
     totalDrafts += r.total_drafts;
     totalWins += r.total_wins;
     totalLosses += r.total_losses;
@@ -158,10 +164,7 @@ export async function getMyStats(params: MyStatsParams): Promise<MyStats> {
   };
 }
 
-export async function getCardStats(
-  cardName: string,
-  set: string
-): Promise<CardStats | null> {
+export async function getCardStats(cardName: string, set: string): Promise<CardStats | null> {
   const db = await getClient();
   const result = await db.execute({
     sql: 'SELECT * FROM card_stats WHERE card_name = ? AND "set" = ?',
@@ -170,10 +173,7 @@ export async function getCardStats(
   return (result.rows[0] as unknown as CardStats) || null;
 }
 
-export async function getFormatTopCards(
-  set: string,
-  limit: number = 20
-): Promise<CardStats[]> {
+export async function getFormatTopCards(set: string, limit: number = 20): Promise<CardStats[]> {
   const db = await getClient();
   const result = await db.execute({
     sql: `SELECT * FROM card_stats
@@ -215,9 +215,8 @@ export async function getMyCardHistory(
     losses: r.losses as number,
   }));
 
-  const avgPick = drafts.length > 0
-    ? drafts.reduce((sum, d) => sum + d.pick, 0) / drafts.length
-    : 0;
+  const avgPick =
+    drafts.length > 0 ? drafts.reduce((sum, d) => sum + d.pick, 0) / drafts.length : 0;
 
   return {
     times_drafted: drafts.length,

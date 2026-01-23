@@ -41,13 +41,16 @@ export interface SeventeenLandsDraftDetail {
   expansion: string;
   num_seats: number;
   picks: SeventeenLandsPick[];
-  card_performance_data: Record<string, {
-    total_times_seen: number;
-    avg_seen_position: number;
-    total_times_picked: number;
-    avg_pick_position: number;
-    game_in_hand_win_rate: number | null;
-  }>;
+  card_performance_data: Record<
+    string,
+    {
+      total_times_seen: number;
+      avg_seen_position: number;
+      total_times_picked: number;
+      avg_pick_position: number;
+      game_in_hand_win_rate: number | null;
+    }
+  >;
 }
 
 export interface SeventeenLandsGame {

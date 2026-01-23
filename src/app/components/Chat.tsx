@@ -35,10 +35,7 @@ export function Chat() {
       if (response.ok) {
         setMessages((prev) => [...prev, { role: "assistant", content: data.text }]);
       } else {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `Error: ${data.error}` },
-        ]);
+        setMessages((prev) => [...prev, { role: "assistant", content: `Error: ${data.error}` }]);
       }
     } catch {
       setMessages((prev) => [
@@ -59,28 +56,19 @@ export function Chat() {
       <div className="h-64 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <p className="text-gray-500 text-sm">
-            Try: "How am I doing in FIN?" or "What's my best color pair?"
+            Try: &quot;How am I doing in FIN?&quot; or &quot;What&apos;s my best color pair?&quot;
           </p>
         )}
         {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`${
-              msg.role === "user" ? "text-right" : "text-left"
-            }`}
-          >
+          <div key={i} className={`${msg.role === "user" ? "text-right" : "text-left"}`}>
             <div
               className={`inline-block p-3 rounded-lg max-w-[80%] ${
-                msg.role === "user"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-900"
+                msg.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
               }`}
             >
               {msg.role === "assistant" ? (
                 <div className="prose prose-sm">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {msg.content}
-                  </ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                 </div>
               ) : (
                 msg.content

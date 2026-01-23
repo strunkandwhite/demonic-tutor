@@ -1,4 +1,4 @@
-import { getDraft, getCardStats } from "@/core/db/queries";
+import { getDraft } from "@/core/db/queries";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 

@@ -22,6 +22,7 @@ SEVENTEEN_LANDS_PASSWORD=yourpassword
 ```
 
 Existing variables (unchanged):
+
 ```
 SEVENTEEN_LANDS_SESSION  # No longer needed, can be removed
 TURSO_DATABASE_URL
@@ -58,15 +59,19 @@ Session state (cookies, localStorage) persists to `.seventeen-lands-session.json
 ## API Endpoints
 
 ### Get Drafts List
+
 ```
 GET /user/data?start_date=...&end_date=...
 ```
+
 Returns all drafts with metadata (wins, losses, colors, ranks).
 
 ### Get Draft Details
+
 ```
 GET /data/draft?draft_id=...
 ```
+
 Returns picks, available cards, card performance data.
 
 ## Incremental Sync
@@ -81,6 +86,7 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
 ```
 
 Date range logic:
+
 - `start_date` = last_sync_date (inclusive) OR "2026-01-06" for first sync
 - `end_date` = tomorrow
 
@@ -97,13 +103,13 @@ The `--full` flag resets to 2026-01-06 and re-queries everything.
 
 ## Error Handling
 
-| Scenario | Action |
-|----------|--------|
-| Login fails (bad credentials) | Throw immediately with clear message |
-| Session expires mid-sync | Detect 401/403 or login redirect, re-login once, retry |
-| Rate limited (429) | Wait 30 seconds, retry up to 3 times |
-| Network error | Retry up to 3 times with exponential backoff |
-| Partial sync failure | Log failures, continue with others, don't update last_sync_date |
+| Scenario                      | Action                                                          |
+| ----------------------------- | --------------------------------------------------------------- |
+| Login fails (bad credentials) | Throw immediately with clear message                            |
+| Session expires mid-sync      | Detect 401/403 or login redirect, re-login once, retry          |
+| Rate limited (429)            | Wait 30 seconds, retry up to 3 times                            |
+| Network error                 | Retry up to 3 times with exponential backoff                    |
+| Partial sync failure          | Log failures, continue with others, don't update last_sync_date |
 
 ## File Structure
 
@@ -126,6 +132,7 @@ src/sync/
 3. **Deduplication test**: Run sync twice, verify no duplicate drafts
 
 Add `--dry-run` flag for local dev:
+
 - Logs in and fetches draft list
 - Prints what would be synced
 - Doesn't write to DB or fetch draft details
@@ -133,10 +140,12 @@ Add `--dry-run` flag for local dev:
 ## Implementation Tasks
 
 ### Task 1: Add sync_metadata table to schema
+
 - Add table definition to `src/core/db/schema.ts`
 - Run migration
 
 ### Task 2: Rewrite SeventeenLandsClient with Playwright
+
 - Replace fetch-based client with Playwright browser
 - Implement session persistence to `.seventeen-lands-session.json`
 - Implement login flow with email/password
@@ -144,21 +153,25 @@ Add `--dry-run` flag for local dev:
 - Add session validation and auto-re-login
 
 ### Task 3: Update sync script for incremental date tracking
+
 - Read last_sync_date from sync_metadata
 - Use as start_date (inclusive), default to 2026-01-06
 - Update last_sync_date after successful sync
 - Support --full flag to reset
 
 ### Task 4: Add error handling and retries
+
 - Retry logic for network errors and rate limits
 - Session expiry detection and re-login
 - Partial failure handling (continue sync, report at end)
 
 ### Task 5: Add --dry-run flag
+
 - Fetch and display draft list without syncing
 - Useful for verifying auth works
 
 ### Task 6: Update .gitignore and environment
+
 - Add `.seventeen-lands-session.json` to .gitignore
 - Remove SEVENTEEN_LANDS_SESSION from .env.local
 - Add SEVENTEEN_LANDS_EMAIL and SEVENTEEN_LANDS_PASSWORD

@@ -132,7 +132,7 @@ export class SeventeenLandsClient {
         const response = await fetch(url, {
           credentials: "include",
           headers: {
-            "accept": "application/json, text/plain, */*",
+            accept: "application/json, text/plain, */*",
           },
         });
 
@@ -192,7 +192,9 @@ export class SeventeenLandsClient {
 
   async getEventDetails(draftId: string): Promise<SeventeenLandsEventDetails> {
     const params = new URLSearchParams({ draft_id: draftId });
-    return withRetry(() => this.fetchApi<SeventeenLandsEventDetails>(`/data/event_details?${params}`));
+    return withRetry(() =>
+      this.fetchApi<SeventeenLandsEventDetails>(`/data/event_details?${params}`)
+    );
   }
 
   async close(): Promise<void> {

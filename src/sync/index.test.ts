@@ -8,9 +8,7 @@ describe("parseGameLink", () => {
   });
 
   it("parses game links with long draft IDs", () => {
-    const result = parseGameLink(
-      "/user/game_replay/20260122/8374259f7e0844febbda9a1c1d3dcf18/0"
-    );
+    const result = parseGameLink("/user/game_replay/20260122/8374259f7e0844febbda9a1c1d3dcf18/0");
     expect(result).toEqual({
       draftId: "8374259f7e0844febbda9a1c1d3dcf18",
       gameNumber: 0,
@@ -51,8 +49,6 @@ describe("parseGameIdFromS3Path", () => {
   });
 
   it("returns null for paths without .json.gz extension", () => {
-    expect(
-      parseGameIdFromS3Path("s3://17lands-game-histories/20260122/abc123.json")
-    ).toBeNull();
+    expect(parseGameIdFromS3Path("s3://17lands-game-histories/20260122/abc123.json")).toBeNull();
   });
 });

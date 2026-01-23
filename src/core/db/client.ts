@@ -33,7 +33,7 @@ export function getClient(): Promise<Client> {
 
 export function closeClient(): void {
   if (clientPromise) {
-    clientPromise.then(client => client.close()).catch(() => {});
+    clientPromise.then((client) => client.close()).catch(() => {});
     clientPromise = null;
   }
 }

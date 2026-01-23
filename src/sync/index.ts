@@ -72,7 +72,9 @@ async function syncGames(
     console.log("Games that would be synced:");
     for (const game of newGames.slice(0, 10)) {
       const parsed = parseGameLink(game.link);
-      console.log(`  - ${parsed?.draftId}_${parsed?.gameNumber} (${game.on_play ? "play" : "draw"}, ${game.won ? "won" : "lost"})`);
+      console.log(
+        `  - ${parsed?.draftId}_${parsed?.gameNumber} (${game.on_play ? "play" : "draw"}, ${game.won ? "won" : "lost"})`
+      );
     }
     if (newGames.length > 10) {
       console.log(`  ... and ${newGames.length - 10} more`);
@@ -135,9 +137,7 @@ async function linkGamesToDrafts(
   const gamesResult = await db.execute(
     "SELECT DISTINCT SUBSTR(id, 1, INSTR(id, '_') - 1) as game_id FROM games WHERE draft_id IS NULL"
   );
-  const unlinkedGameIds = new Set(
-    gamesResult.rows.map((r) => r.game_id as string)
-  );
+  const unlinkedGameIds = new Set(gamesResult.rows.map((r) => r.game_id as string));
 
   let updated = 0;
   for (const draftId of draftIds) {
@@ -209,9 +209,7 @@ async function sync() {
     console.log(`Querying drafts from ${startDate} to ${endDate}`);
 
     const userData = await api.getUserData(startDate.split("T")[0], endDate.split("T")[0]);
-    const draftsToSync = userData.drafts.filter(
-      (d) => d.has_picks && !existingDrafts.has(d.id)
-    );
+    const draftsToSync = userData.drafts.filter((d) => d.has_picks && !existingDrafts.has(d.id));
 
     console.log(`Found ${draftsToSync.length} new drafts to sync`);
 
@@ -347,11 +345,7 @@ async function insertPicksAndCards(
   }
 }
 
-async function updateCardStats(
-  db: DbClient,
-  set: string,
-  detail: SeventeenLandsDraftDetail
-) {
+async function updateCardStats(db: DbClient, set: string, detail: SeventeenLandsDraftDetail) {
   const now = new Date().toISOString();
 
   for (const [cardName, stats] of Object.entries(detail.card_performance_data)) {

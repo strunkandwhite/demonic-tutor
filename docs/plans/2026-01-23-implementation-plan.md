@@ -13,6 +13,7 @@
 ## Task 1: Project Setup
 
 **Files:**
+
 - Modify: `package.json`
 - Create: `tsconfig.json`
 - Create: `src/app/layout.tsx`
@@ -95,6 +96,7 @@ Expected: Dependencies installed
 **Step 4: Create minimal Next.js app structure**
 
 Create `src/app/layout.tsx`:
+
 ```tsx
 import type { Metadata } from "next";
 import "./globals.css";
@@ -104,11 +106,7 @@ export const metadata: Metadata = {
   description: "Personal MTG draft analytics",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>{children}</body>
@@ -118,11 +116,13 @@ export default function RootLayout({
 ```
 
 Create `src/app/globals.css`:
+
 ```css
 @import "tailwindcss";
 ```
 
 Create `src/app/page.tsx`:
+
 ```tsx
 export default function Home() {
   return (
@@ -170,6 +170,7 @@ git commit -m "feat: initialize Next.js project with dependencies"
 ## Task 2: Database Schema & Client
 
 **Files:**
+
 - Create: `src/core/db/schema.ts`
 - Create: `src/core/db/client.ts`
 - Create: `src/core/db/migrate.ts`
@@ -178,6 +179,7 @@ git commit -m "feat: initialize Next.js project with dependencies"
 **Step 1: Create type definitions**
 
 Create `src/core/db/schema.ts`:
+
 ```typescript
 /**
  * Database schema types for Demonic Tutor.
@@ -277,6 +279,7 @@ CREATE INDEX IF NOT EXISTS idx_card_stats_set ON card_stats(set);
 **Step 2: Create database client**
 
 Create `src/core/db/client.ts`:
+
 ```typescript
 /**
  * Turso database client singleton.
@@ -324,6 +327,7 @@ export type { Client } from "@libsql/client";
 **Step 3: Create migration script**
 
 Create `src/core/db/migrate.ts`:
+
 ```typescript
 /**
  * Run database migrations.
@@ -338,10 +342,9 @@ async function migrate() {
   const client = await getClient();
 
   // Split by semicolon and execute each statement
-  const statements = CREATE_TABLES_SQL
-    .split(";")
-    .map(s => s.trim())
-    .filter(s => s.length > 0);
+  const statements = CREATE_TABLES_SQL.split(";")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 
   for (const sql of statements) {
     await client.execute(sql);
@@ -359,6 +362,7 @@ migrate().catch(console.error);
 Run: `pnpm add dotenv`
 
 Add to package.json scripts:
+
 ```json
 "db:migrate": "tsx src/core/db/migrate.ts"
 ```
@@ -375,6 +379,7 @@ git commit -m "feat: add database schema and client"
 ## Task 3: 17lands API Client
 
 **Files:**
+
 - Create: `src/core/seventeen-lands/client.ts`
 - Create: `src/core/seventeen-lands/types.ts`
 - Test: `src/core/seventeen-lands/client.test.ts`
@@ -382,6 +387,7 @@ git commit -m "feat: add database schema and client"
 **Step 1: Create API types**
 
 Create `src/core/seventeen-lands/types.ts`:
+
 ```typescript
 /**
  * Types for 17lands API responses.
@@ -426,28 +432,29 @@ export interface SeventeenLandsDraftDetail {
   expansion: string;
   num_seats: number;
   picks: SeventeenLandsPick[];
-  card_performance_data: Record<string, {
-    total_times_seen: number;
-    avg_seen_position: number;
-    total_times_picked: number;
-    avg_pick_position: number;
-    game_in_hand_win_rate: number | null;
-  }>;
+  card_performance_data: Record<
+    string,
+    {
+      total_times_seen: number;
+      avg_seen_position: number;
+      total_times_picked: number;
+      avg_pick_position: number;
+      game_in_hand_win_rate: number | null;
+    }
+  >;
 }
 ```
 
 **Step 2: Create API client**
 
 Create `src/core/seventeen-lands/client.ts`:
+
 ```typescript
 /**
  * 17lands API client.
  */
 
-import type {
-  SeventeenLandsUserData,
-  SeventeenLandsDraftDetail,
-} from "./types";
+import type { SeventeenLandsUserData, SeventeenLandsDraftDetail } from "./types";
 
 const BASE_URL = "https://www.17lands.com";
 
@@ -497,6 +504,7 @@ export function createSeventeenLandsClient(): SeventeenLandsClient {
 **Step 3: Create index export**
 
 Create `src/core/seventeen-lands/index.ts`:
+
 ```typescript
 export { SeventeenLandsClient, createSeventeenLandsClient } from "./client";
 export type * from "./types";
@@ -514,12 +522,14 @@ git commit -m "feat: add 17lands API client"
 ## Task 4: Sync Script
 
 **Files:**
+
 - Create: `src/sync/index.ts`
 - Test: `src/sync/index.test.ts`
 
 **Step 1: Create sync script**
 
 Create `src/sync/index.ts`:
+
 ```typescript
 /**
  * Sync drafts from 17lands to local database.
@@ -553,9 +563,7 @@ async function sync() {
 
   // Fetch user data from 17lands
   const userData = await api.getUserData();
-  const draftsToSync = userData.drafts.filter(
-    (d) => d.has_picks && !existingDrafts.has(d.id)
-  );
+  const draftsToSync = userData.drafts.filter((d) => d.has_picks && !existingDrafts.has(d.id));
 
   console.log(`Found ${draftsToSync.length} new drafts to sync`);
 
@@ -720,12 +728,14 @@ git commit -m "feat: add sync script for 17lands data"
 ## Task 5: Database Queries
 
 **Files:**
+
 - Create: `src/core/db/queries.ts`
 - Test: `src/core/db/queries.test.ts`
 
 **Step 1: Create query functions**
 
 Create `src/core/db/queries.ts`:
+
 ```typescript
 /**
  * Database query functions for LLM tools.
@@ -861,7 +871,13 @@ export async function getMyStats(params: MyStatsParams): Promise<MyStats> {
   const colorBreakdown: Record<string, { drafts: number; wins: number; losses: number }> = {};
 
   for (const row of result.rows) {
-    const r = row as { total_drafts: number; total_wins: number; total_losses: number; trophies: number; colors: string };
+    const r = row as {
+      total_drafts: number;
+      total_wins: number;
+      total_losses: number;
+      trophies: number;
+      colors: string;
+    };
     totalDrafts += r.total_drafts;
     totalWins += r.total_wins;
     totalLosses += r.total_losses;
@@ -886,10 +902,7 @@ export async function getMyStats(params: MyStatsParams): Promise<MyStats> {
   };
 }
 
-export async function getCardStats(
-  cardName: string,
-  set: string
-): Promise<CardStats | null> {
+export async function getCardStats(cardName: string, set: string): Promise<CardStats | null> {
   const db = await getClient();
   const result = await db.execute({
     sql: "SELECT * FROM card_stats WHERE card_name = ? AND set = ?",
@@ -898,10 +911,7 @@ export async function getCardStats(
   return (result.rows[0] as unknown as CardStats) || null;
 }
 
-export async function getFormatTopCards(
-  set: string,
-  limit: number = 20
-): Promise<CardStats[]> {
+export async function getFormatTopCards(set: string, limit: number = 20): Promise<CardStats[]> {
   const db = await getClient();
   const result = await db.execute({
     sql: `SELECT * FROM card_stats
@@ -943,9 +953,8 @@ export async function getMyCardHistory(
     losses: r.losses as number,
   }));
 
-  const avgPick = drafts.length > 0
-    ? drafts.reduce((sum, d) => sum + d.pick, 0) / drafts.length
-    : 0;
+  const avgPick =
+    drafts.length > 0 ? drafts.reduce((sum, d) => sum + d.pick, 0) / drafts.length : 0;
 
   return {
     times_drafted: drafts.length,
@@ -959,6 +968,7 @@ export async function getMyCardHistory(
 **Step 2: Create index export**
 
 Create `src/core/db/index.ts`:
+
 ```typescript
 export { getClient, closeClient } from "./client";
 export * from "./schema";
@@ -977,6 +987,7 @@ git commit -m "feat: add database query functions"
 ## Task 6: LLM Tools
 
 **Files:**
+
 - Create: `src/core/llm/tools.ts`
 - Create: `src/core/llm/handlers.ts`
 - Create: `src/core/llm/index.ts`
@@ -984,6 +995,7 @@ git commit -m "feat: add database query functions"
 **Step 1: Create tool definitions**
 
 Create `src/core/llm/tools.ts`:
+
 ```typescript
 /**
  * OpenAI function tool definitions.
@@ -1104,6 +1116,7 @@ export function isValidToolName(name: string): name is ToolName {
 **Step 2: Create tool handlers**
 
 Create `src/core/llm/handlers.ts`:
+
 ```typescript
 /**
  * Tool execution handlers.
@@ -1139,9 +1152,7 @@ export async function executeToolCall(
       );
 
     case "get_card_stats":
-      return JSON.stringify(
-        await getCardStats(args.card_name as string, args.set as string)
-      );
+      return JSON.stringify(await getCardStats(args.card_name as string, args.set as string));
 
     case "get_format_top_cards":
       return JSON.stringify(
@@ -1157,6 +1168,7 @@ export async function executeToolCall(
 **Step 3: Create LLM client**
 
 Create `src/core/llm/client.ts`:
+
 ```typescript
 /**
  * OpenAI LLM client with tool support.
@@ -1233,9 +1245,10 @@ export async function chat(message: string): Promise<ChatResult> {
   }
 
   const textOutput = currentResponse.output.find((o) => o.type === "message");
-  const text = textOutput?.type === "message"
-    ? textOutput.content.map((c) => (c.type === "text" ? c.text : "")).join("")
-    : "";
+  const text =
+    textOutput?.type === "message"
+      ? textOutput.content.map((c) => (c.type === "text" ? c.text : "")).join("")
+      : "";
 
   return {
     text,
@@ -1248,6 +1261,7 @@ export async function chat(message: string): Promise<ChatResult> {
 **Step 4: Create index export**
 
 Create `src/core/llm/index.ts`:
+
 ```typescript
 export { chat } from "./client";
 export { tools, isValidToolName, type ToolName } from "./tools";
@@ -1266,11 +1280,13 @@ git commit -m "feat: add LLM tools and handlers"
 ## Task 7: Chat API Route
 
 **Files:**
+
 - Create: `src/app/api/chat/route.ts`
 
 **Step 1: Create chat API route**
 
 Create `src/app/api/chat/route.ts`:
+
 ```typescript
 /**
  * Chat API endpoint.
@@ -1300,10 +1316,7 @@ export async function POST(
     const body = (await request.json()) as ChatRequest;
 
     if (!body.message || typeof body.message !== "string") {
-      return NextResponse.json(
-        { error: "Missing or invalid 'message' field" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing or invalid 'message' field" }, { status: 400 });
     }
 
     const result = await chat(body.message);
@@ -1318,17 +1331,11 @@ export async function POST(
 
     if (error instanceof Error) {
       if (error.message.includes("OPENAI_API_KEY")) {
-        return NextResponse.json(
-          { error: "OpenAI API key not configured" },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: "OpenAI API key not configured" }, { status: 500 });
       }
     }
 
-    return NextResponse.json(
-      { error: "An unexpected error occurred" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 });
   }
 }
 ```
@@ -1345,6 +1352,7 @@ git commit -m "feat: add chat API route"
 ## Task 8: Dashboard UI
 
 **Files:**
+
 - Modify: `src/app/page.tsx`
 - Create: `src/app/components/Chat.tsx`
 - Create: `src/app/components/StatsCards.tsx`
@@ -1353,6 +1361,7 @@ git commit -m "feat: add chat API route"
 **Step 1: Create Chat component**
 
 Create `src/app/components/Chat.tsx`:
+
 ```tsx
 "use client";
 
@@ -1391,10 +1400,7 @@ export function Chat() {
       if (response.ok) {
         setMessages((prev) => [...prev, { role: "assistant", content: data.text }]);
       } else {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `Error: ${data.error}` },
-        ]);
+        setMessages((prev) => [...prev, { role: "assistant", content: `Error: ${data.error}` }]);
       }
     } catch {
       setMessages((prev) => [
@@ -1419,17 +1425,10 @@ export function Chat() {
           </p>
         )}
         {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`${
-              msg.role === "user" ? "text-right" : "text-left"
-            }`}
-          >
+          <div key={i} className={`${msg.role === "user" ? "text-right" : "text-left"}`}>
             <div
               className={`inline-block p-3 rounded-lg max-w-[80%] ${
-                msg.role === "user"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-900"
+                msg.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
               }`}
             >
               {msg.role === "assistant" ? (
@@ -1478,6 +1477,7 @@ export function Chat() {
 **Step 2: Create StatsCards component**
 
 Create `src/app/components/StatsCards.tsx`:
+
 ```tsx
 import { getMyStats } from "@/core/db/queries";
 
@@ -1519,6 +1519,7 @@ export async function StatsCards() {
 **Step 3: Create DraftTable component**
 
 Create `src/app/components/DraftTable.tsx`:
+
 ```tsx
 import { listDrafts } from "@/core/db/queries";
 import Link from "next/link";
@@ -1581,6 +1582,7 @@ export async function DraftTable() {
 **Step 4: Update main page**
 
 Update `src/app/page.tsx`:
+
 ```tsx
 import { Chat } from "./components/Chat";
 import { StatsCards } from "./components/StatsCards";
@@ -1623,11 +1625,13 @@ git commit -m "feat: add dashboard with chat, stats, and draft table"
 ## Task 9: Draft Detail Page
 
 **Files:**
+
 - Create: `src/app/draft/[id]/page.tsx`
 
 **Step 1: Create draft detail page**
 
 Create `src/app/draft/[id]/page.tsx`:
+
 ```tsx
 import { getDraft, getCardStats } from "@/core/db/queries";
 import Link from "next/link";
@@ -1727,12 +1731,14 @@ git commit -m "feat: add draft detail page"
 ## Task 10: Final Polish
 
 **Files:**
+
 - Create: `src/app/not-found.tsx`
 - Create: `README.md`
 
 **Step 1: Create 404 page**
 
 Create `src/app/not-found.tsx`:
+
 ```tsx
 import Link from "next/link";
 
@@ -1754,7 +1760,8 @@ export default function NotFound() {
 **Step 2: Create README**
 
 Create `README.md`:
-```markdown
+
+````markdown
 # Demonic Tutor
 
 Personal MTG Arena draft analytics powered by 17lands data.
@@ -1781,6 +1788,7 @@ pnpm sync
 # Start the dev server
 pnpm dev
 ```
+````
 
 ## Commands
 
@@ -1788,14 +1796,15 @@ pnpm dev
 - `pnpm sync --full` - Full re-sync (clears database first)
 - `pnpm dev` - Start development server
 - `pnpm build` - Build for production
-```
+
+````
 
 **Step 3: Commit**
 
 ```bash
 git add -A
 git commit -m "feat: add 404 page and README"
-```
+````
 
 ---
 

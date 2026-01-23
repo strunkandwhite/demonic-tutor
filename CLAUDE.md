@@ -66,11 +66,13 @@ The sync system uses Playwright to authenticate with 17lands and bypass WAF prot
 - `--dry-run` flag shows what would sync without writing to DB
 
 **Sync steps:**
+
 1. Sync drafts from 17lands (date-range based)
 2. Sync games from 17lands (all games, dedup by ID)
 3. Augment cards from Scryfall (only cards missing oracle_text)
 
 **Tables:**
+
 - `sync_metadata` - Key-value store for sync state (last_sync_date)
 
 ## Environment Variables
@@ -89,3 +91,9 @@ The sync system uses Playwright to authenticate with 17lands and bypass WAF prot
 - `get_my_card_history` - User's history with a specific card
 - `get_card_stats` - 17lands stats for a card
 - `get_format_top_cards` - Top cards by GIH win rate
+
+## Coding Conventions
+
+- **Unused variables**: REMOVE them completely, do not rename to `_var`
+- **Unused imports**: REMOVE them, do not leave commented out
+- **Backwards compatibility**: Delete unused code, don't add `// removed` comments

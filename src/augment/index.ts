@@ -56,9 +56,7 @@ export async function augmentCards() {
   const db = await getClient();
 
   // Find cards missing oracle_text
-  const result = await db.execute(
-    "SELECT name FROM cards WHERE oracle_text IS NULL"
-  );
+  const result = await db.execute("SELECT name FROM cards WHERE oracle_text IS NULL");
 
   const cardsToAugment = result.rows.map((r) => r.name as string);
   console.log(`Found ${cardsToAugment.length} cards to augment`);

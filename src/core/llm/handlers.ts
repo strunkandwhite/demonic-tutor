@@ -32,9 +32,7 @@ export async function executeToolCall(
       );
 
     case "get_card_stats":
-      return JSON.stringify(
-        await getCardStats(args.card_name as string, args.set as string)
-      );
+      return JSON.stringify(await getCardStats(args.card_name as string, args.set as string));
 
     case "get_format_top_cards":
       return JSON.stringify(
