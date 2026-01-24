@@ -69,14 +69,11 @@ export async function chat(
 
   const openai = new OpenAI({ apiKey });
 
-  // Always pass instructions when userContext is provided (to include context in system prompt)
   const instructions = buildInstructions(userContext);
   const response = await openai.responses.create({
     model,
-    ...(previousResponseId && !userContext
-      ? { previous_response_id: previousResponseId }
-      : { instructions }),
-    ...(previousResponseId && userContext ? { previous_response_id: previousResponseId } : {}),
+    instructions,
+    ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
     input: message,
     tools,
   });
