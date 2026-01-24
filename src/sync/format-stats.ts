@@ -64,28 +64,45 @@ async function wasColorStatsUpdatedToday(db: DbClient, set: string): Promise<boo
 }
 
 /**
+ * Check if format_play_draw was updated today.
+ */
+async function wasPlayDrawUpdatedToday(db: DbClient): Promise<boolean> {
+  const today = new Date().toISOString().split("T")[0];
+  const result = await db.execute({
+    sql: `SELECT 1 FROM format_play_draw WHERE updated_at >= ? LIMIT 1`,
+    args: [today],
+  });
+  return result.rows.length > 0;
+}
+
+/**
  * Insert a trophy decklist into the database.
  */
 async function insertTrophyDecklist(
   db: DbClient,
   draftId: string,
+  set: string,
   deck: SeventeenLandsDeck
 ): Promise<void> {
-  // Insert decklist metadata with source='trophy'
-  await db.execute({
-    sql: `INSERT OR IGNORE INTO decklists (draft_id, main_colors, splash_colors, source)
-          VALUES (?, ?, ?, 'trophy')`,
-    args: [draftId, deck.main_colors || null, deck.splash_colors || null],
-  });
+  const colors = deck.main_colors || "unknown";
 
-  // Check if we actually inserted (might already exist)
+  // Check if we already have cards for this deck
   const existing = await db.execute({
     sql: `SELECT 1 FROM decklist_cards WHERE draft_id = ? LIMIT 1`,
     args: [draftId],
   });
   if (existing.rows.length > 0) {
-    return; // Already have cards for this deck
+    console.log(`  [turso] Skipping ${draftId} (${colors}) - already exists`);
+    return;
   }
+
+  // Insert decklist metadata with source='trophy'
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO decklists (draft_id, "set", main_colors, splash_colors, source)
+          VALUES (?, ?, ?, ?, 'trophy')`,
+    args: [draftId, set, deck.main_colors || null, deck.splash_colors || null],
+  });
+  console.log(`  [turso] Inserted decklist ${draftId} (${colors})`);
 
   // Count cards by ID
   const countCards = (cardIds: number[]): Map<number, number> => {
@@ -97,6 +114,7 @@ async function insertTrophyDecklist(
   };
 
   // Process each group (Maindeck, Sideboard)
+  let cardsInserted = 0;
   for (const group of deck.groups) {
     const isMaindeck = group.name === "Maindeck" ? 1 : 0;
     const cardCounts = countCards(group.cards);
@@ -126,8 +144,10 @@ async function insertTrophyDecklist(
               VALUES (?, ?, ?, ?)`,
         args: [draftId, card.name, quantity, isMaindeck],
       });
+      cardsInserted++;
     }
   }
+  console.log(`  [turso] Inserted ${cardsInserted} cards for ${draftId}`);
 }
 
 export async function syncFormatStats(
@@ -143,47 +163,51 @@ export async function syncFormatStats(
   startDateObj.setDate(startDateObj.getDate() - 30);
   const startDate = startDateObj.toISOString().split("T")[0];
 
-  // 1. Sync play/draw stats (every sync)
-  console.log("Syncing play/draw stats...");
-  const playDrawStats = await api.getPlayDrawStats();
-
   // Get user's sets from drafts table
   const setsResult = await db.execute('SELECT DISTINCT "set" FROM drafts');
   const userSets = new Set(setsResult.rows.map((r) => r.set as string));
   console.log(`User has drafts in ${userSets.size} sets: ${[...userSets].join(", ")}`);
 
-  // Filter to user's sets only
-  const relevantPlayDraw = playDrawStats.filter((s) => userSets.has(s.expansion));
-  console.log(`Found ${relevantPlayDraw.length} play/draw stats for user's sets`);
-
-  if (dryRun) {
-    console.log("Play/draw stats that would be upserted:");
-    for (const stat of relevantPlayDraw) {
-      console.log(
-        `  - ${stat.expansion} ${stat.event_type}: play WR ${(stat.win_rate_on_play * 100).toFixed(1)}%, avg ${stat.average_game_length.toFixed(1)} turns (n=${stat.sample_size})`
-      );
-    }
+  // 1. Sync play/draw stats (skip if updated today)
+  if (!dryRun && (await wasPlayDrawUpdatedToday(db))) {
+    console.log("Skipping play/draw stats - already updated today");
   } else {
-    for (const stat of relevantPlayDraw) {
-      await db.execute({
-        sql: `INSERT INTO format_play_draw ("set", event_type, avg_game_length, play_win_rate, sample_size, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?)
-              ON CONFLICT("set", event_type) DO UPDATE SET
-                avg_game_length = excluded.avg_game_length,
-                play_win_rate = excluded.play_win_rate,
-                sample_size = excluded.sample_size,
-                updated_at = excluded.updated_at`,
-        args: [
-          stat.expansion,
-          stat.event_type,
-          stat.average_game_length,
-          stat.win_rate_on_play,
-          stat.sample_size,
-          now,
-        ],
-      });
+    console.log("Syncing play/draw stats...");
+    const playDrawStats = await api.getPlayDrawStats();
+
+    // Filter to user's sets only
+    const relevantPlayDraw = playDrawStats.filter((s) => userSets.has(s.expansion));
+    console.log(`Found ${relevantPlayDraw.length} play/draw stats for user's sets`);
+
+    if (dryRun) {
+      console.log("Play/draw stats that would be upserted:");
+      for (const stat of relevantPlayDraw) {
+        console.log(
+          `  - ${stat.expansion} ${stat.event_type}: play WR ${(stat.win_rate_on_play * 100).toFixed(1)}%, avg ${stat.average_game_length.toFixed(1)} turns (n=${stat.sample_size})`
+        );
+      }
+    } else {
+      for (const stat of relevantPlayDraw) {
+        await db.execute({
+          sql: `INSERT INTO format_play_draw ("set", event_type, avg_game_length, play_win_rate, sample_size, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT("set", event_type) DO UPDATE SET
+                  avg_game_length = excluded.avg_game_length,
+                  play_win_rate = excluded.play_win_rate,
+                  sample_size = excluded.sample_size,
+                  updated_at = excluded.updated_at`,
+          args: [
+            stat.expansion,
+            stat.event_type,
+            stat.average_game_length,
+            stat.win_rate_on_play,
+            stat.sample_size,
+            now,
+          ],
+        });
+      }
+      console.log(`[turso] Upserted ${relevantPlayDraw.length} play/draw stats`);
     }
-    console.log(`[turso] Upserted ${relevantPlayDraw.length} play/draw stats`);
   }
 
   // 2. For each set: color ratings + trophy decks
@@ -265,7 +289,7 @@ export async function syncFormatStats(
         for (const trophyDeck of selectedDecks) {
           try {
             const deck = await api.getDeck(trophyDeck.aggregate_id, trophyDeck.deck_index);
-            await insertTrophyDecklist(db, trophyDeck.aggregate_id, deck);
+            await insertTrophyDecklist(db, trophyDeck.aggregate_id, set, deck);
             synced++;
           } catch (err) {
             failed++;

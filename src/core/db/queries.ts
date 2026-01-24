@@ -556,11 +556,11 @@ export async function getTrophyDecklists(
   const db = await getClient();
 
   // Build conditions for decklists
-  const conditions: string[] = ["dl.source = ?", 'd."set" = ?'];
+  const conditions: string[] = ["source = ?", '"set" = ?'];
   const args: (string | number)[] = ["trophy", set];
 
   if (colors) {
-    conditions.push("dl.main_colors = ?");
+    conditions.push("main_colors = ?");
     args.push(colors);
   }
 
@@ -568,11 +568,9 @@ export async function getTrophyDecklists(
 
   // Get trophy decklists
   const decklistsResult = await db.execute({
-    sql: `SELECT dl.draft_id, dl.main_colors, dl.splash_colors
-          FROM decklists dl
-          JOIN drafts d ON dl.draft_id = d.id
+    sql: `SELECT draft_id, main_colors, splash_colors
+          FROM decklists
           WHERE ${conditions.join(" AND ")}
-          ORDER BY d.draft_date DESC
           LIMIT ?`,
     args,
   });

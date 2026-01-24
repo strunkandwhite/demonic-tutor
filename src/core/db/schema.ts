@@ -66,6 +66,7 @@ export interface Game {
 
 export interface Decklist {
   draft_id: string;
+  set: string | null;
   main_colors: string | null;
   splash_colors: string | null;
   source: string; // 'user' or 'trophy'
@@ -174,6 +175,7 @@ CREATE INDEX IF NOT EXISTS idx_games_draft ON games(draft_id);
 
 CREATE TABLE IF NOT EXISTS decklists (
   draft_id TEXT PRIMARY KEY,
+  "set" TEXT,
   main_colors TEXT,
   splash_colors TEXT,
   source TEXT DEFAULT 'user'
@@ -187,6 +189,7 @@ CREATE TABLE IF NOT EXISTS decklist_cards (
   PRIMARY KEY (draft_id, card_name, is_maindeck)
 );
 
+CREATE INDEX IF NOT EXISTS idx_decklists_set ON decklists("set");
 CREATE INDEX IF NOT EXISTS idx_decklist_cards_card ON decklist_cards(card_name);
 CREATE INDEX IF NOT EXISTS idx_decklist_cards_draft ON decklist_cards(draft_id);
 

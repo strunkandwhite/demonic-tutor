@@ -13,6 +13,8 @@ const MIGRATIONS = [
   "ALTER TABLE cards ADD COLUMN scryfall_not_found INTEGER DEFAULT 0",
   // 002: Add source column to decklists for trophy deck support
   "ALTER TABLE decklists ADD COLUMN source TEXT DEFAULT 'user'",
+  // 004: Add set column to decklists for trophy deck filtering
+  'ALTER TABLE decklists ADD COLUMN "set" TEXT',
 ];
 
 // Complex migrations that need special handling (table recreation for FK removal)
@@ -37,14 +39,15 @@ const COMPLEX_MIGRATIONS = [
       await client.execute(`
         CREATE TABLE IF NOT EXISTS decklists_new (
           draft_id TEXT PRIMARY KEY,
+          "set" TEXT,
           main_colors TEXT,
           splash_colors TEXT,
           source TEXT DEFAULT 'user'
         )
       `);
       await client.execute(`
-        INSERT OR IGNORE INTO decklists_new (draft_id, main_colors, splash_colors, source)
-        SELECT draft_id, main_colors, splash_colors, COALESCE(source, 'user') FROM decklists
+        INSERT OR IGNORE INTO decklists_new (draft_id, "set", main_colors, splash_colors, source)
+        SELECT draft_id, "set", main_colors, splash_colors, COALESCE(source, 'user') FROM decklists
       `);
       await client.execute("DROP TABLE decklists");
       await client.execute("ALTER TABLE decklists_new RENAME TO decklists");
