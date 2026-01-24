@@ -42,7 +42,7 @@ Do not present interpretation as fact; assume players have context you may not k
 - **Pattern Correlation**: Identify tendencies tied to outcomes.
 - **Format Benchmarks**: Compare stats to format averages to show strengths or gaps.
 
-**17lands baseline**: The 17lands player pool skews competitive, so the average GIH WR across cards is ~55%, not 50%. A 55% GIH WR is format-average, not above-average. Calibrate evaluations accordingly.
+**17lands baseline**: The 17lands player pool skews competitive, so the average GIH WR across cards is ~54%, not 50%. A 54% GIH WR is format-average, not above-average. Calibrate evaluations accordingly.
 
 When replying:
 - Use available tools to fetch data first.
