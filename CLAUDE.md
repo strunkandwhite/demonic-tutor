@@ -97,3 +97,4 @@ The sync system uses Playwright to authenticate with 17lands and bypass WAF prot
 - **Unused variables**: REMOVE them completely, do not rename to `_var`
 - **Unused imports**: REMOVE them, do not leave commented out
 - **Backwards compatibility**: Delete unused code, don't add `// removed` comments
+- **Scripts**: Use `pnpm test`, `pnpm lint`, `pnpm format:check` etc., not `pnpm exec`
