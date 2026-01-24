@@ -3,6 +3,18 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { CardLink } from "./CardLink";
+
+/**
+ * Replace [[Card Name]] with markdown links using card: protocol.
+ * The card name in the URL is encoded to handle special characters.
+ */
+function processCardLinks(text: string): string {
+  return text.replace(
+    /\[\[([^\]]+)\]\]/g,
+    (_, cardName) => `[${cardName}](card:${encodeURIComponent(cardName)})`
+  );
+}
 
 type ModelId = "gpt-4o-mini" | "gpt-5.2-2025-12-11";
 
@@ -130,7 +142,7 @@ export function Chat() {
   }, []);
 
   return (
-    <div className="flex h-[400px] flex-col rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+    <div className="flex h-[600px] flex-col rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-800">
         <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Ask about your drafts</h2>
@@ -185,7 +197,24 @@ export function Chat() {
                       <p className="whitespace-pre-wrap text-sm">{message.content}</p>
                     ) : (
                       <div className="prose prose-sm prose-zinc max-w-none dark:prose-invert">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          urlTransform={(url) => {
+                            if (url.startsWith("card:")) return url;
+                            return url;
+                          }}
+                          components={{
+                            a: ({ href, children }) => {
+                              if (href?.startsWith("card:")) {
+                                const cardName = decodeURIComponent(href.slice(5));
+                                return <CardLink name={cardName} />;
+                              }
+                              return <a href={href}>{children}</a>;
+                            },
+                          }}
+                        >
+                          {processCardLinks(message.content)}
+                        </ReactMarkdown>
                       </div>
                     )}
                   </div>
