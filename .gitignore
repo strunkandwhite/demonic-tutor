@@ -11,3 +11,4 @@ tsconfig.tsbuildinfo
 .seventeen-lands-session.json
 
 todo.md
+next-env.d.ts
