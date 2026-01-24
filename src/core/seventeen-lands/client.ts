@@ -10,6 +10,9 @@ import type {
   SeventeenLandsGameList,
   SeventeenLandsEventDetails,
   SeventeenLandsDeck,
+  SeventeenLandsColorRating,
+  SeventeenLandsPlayDrawStats,
+  SeventeenLandsTrophyDeck,
 } from "./types";
 
 const BASE_URL = "https://www.17lands.com";
@@ -230,6 +233,80 @@ export class SeventeenLandsClient {
     }
   }
 
+  private async fetchApiPost<T>(path: string, body: unknown, retryCount: number = 0): Promise<T> {
+    const page = await this.ensureBrowser();
+    const fullUrl = `${BASE_URL}${path}`;
+
+    // Enforce minimum delay between API calls
+    await this.enforceRateLimit();
+
+    log(`API POST: ${path}`);
+    const startTime = Date.now();
+
+    try {
+      const result = await page.evaluate(
+        async ({ url, bodyData }: { url: string; bodyData: unknown }) => {
+          const response = await fetch(url, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              accept: "application/json, text/plain, */*",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(bodyData),
+          });
+
+          // Return both status and data for logging
+          const data = response.ok ? await response.json() : null;
+          return {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            data,
+          };
+        },
+        { url: fullUrl, bodyData: body }
+      );
+
+      const elapsed = Date.now() - startTime;
+      log(`API RESPONSE: ${result.status} ${result.statusText} (${elapsed}ms)`);
+
+      if (result.status === 401 || result.status === 403) {
+        throw new Error(`AUTH_ERROR:${result.status}`);
+      }
+
+      if (result.status === 429) {
+        throw new Error("RATE_LIMITED");
+      }
+
+      if (!result.ok) {
+        throw new Error(`API error: ${result.status} ${result.statusText}`);
+      }
+
+      return result.data as T;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const elapsed = Date.now() - startTime;
+      log(`API ERROR: ${message} (${elapsed}ms)`);
+
+      // Handle auth errors - try re-login once
+      if (message.includes("AUTH_ERROR") && retryCount === 0) {
+        log("Session expired, re-authenticating...");
+        await this.login();
+        await sleep(MIN_API_DELAY_MS, "post-auth delay");
+        return this.fetchApiPost<T>(path, body, retryCount + 1);
+      }
+
+      // Handle rate limiting
+      if (message === "RATE_LIMITED") {
+        await sleep(30000, "rate limited by server");
+        return this.fetchApiPost<T>(path, body, retryCount);
+      }
+
+      throw error;
+    }
+  }
+
   async getUserData(startDate: string, endDate: string): Promise<SeventeenLandsUserData> {
     log(`getUserData(${startDate}, ${endDate})`);
     const params = new URLSearchParams({
@@ -265,6 +342,39 @@ export class SeventeenLandsClient {
       deck_index: deckIndex.toString(),
     });
     return withRetry(() => this.fetchApi<SeventeenLandsDeck>(`/data/deck?${params}`));
+  }
+
+  async getColorRatings(
+    expansion: string,
+    eventType?: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<SeventeenLandsColorRating[]> {
+    log(`getColorRatings(${expansion}, ${eventType}, ${startDate}, ${endDate})`);
+    const params = new URLSearchParams({ expansion });
+    if (eventType) params.set("event_type", eventType);
+    if (startDate) params.set("start_date", startDate);
+    if (endDate) params.set("end_date", endDate);
+    return withRetry(() =>
+      this.fetchApi<SeventeenLandsColorRating[]>(`/color_ratings/data?${params}`)
+    );
+  }
+
+  async getPlayDrawStats(): Promise<SeventeenLandsPlayDrawStats[]> {
+    log("getPlayDrawStats()");
+    return withRetry(() => this.fetchApi<SeventeenLandsPlayDrawStats[]>("/data/play_draw"));
+  }
+
+  async getTrophyDecks(expansion: string, eventType?: string): Promise<SeventeenLandsTrophyDeck[]> {
+    log(`getTrophyDecks(${expansion}, ${eventType})`);
+    const body = {
+      expansion,
+      event_type: eventType ?? "PremierDraft",
+      card_names: [],
+      ranks: [],
+      deck_colors: [],
+    };
+    return withRetry(() => this.fetchApiPost<SeventeenLandsTrophyDeck[]>("/data/trophies/", body));
   }
 
   async close(): Promise<void> {
