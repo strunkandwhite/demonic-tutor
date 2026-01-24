@@ -28,6 +28,7 @@ export function Chat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState<ModelId>("gpt-5.2-2025-12-11");
+  const [responseId, setResponseId] = useState<string | null>(null);
 
   // Refs for auto-scrolling and textarea auto-resize
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -74,7 +75,11 @@ export function Chat() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmedInput, model }),
+        body: JSON.stringify({
+          message: trimmedInput,
+          model,
+          ...(responseId && { previousResponseId: responseId }),
+        }),
       });
 
       const data = await response.json();
@@ -82,6 +87,8 @@ export function Chat() {
       if (!response.ok) {
         throw new Error(data.error || "Request failed");
       }
+
+      setResponseId(data.responseId);
 
       const assistantMessage: Message = {
         id: generateMessageId(),
@@ -95,7 +102,7 @@ export function Chat() {
     } finally {
       setLoading(false);
     }
-  }, [input, loading, model]);
+  }, [input, loading, model, responseId]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -119,6 +126,7 @@ export function Chat() {
   const clearConversation = useCallback(() => {
     setMessages([]);
     setError(null);
+    setResponseId(null);
   }, []);
 
   return (

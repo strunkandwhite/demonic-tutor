@@ -8,6 +8,7 @@ import { chat, AVAILABLE_MODELS, type ModelId } from "@/core/llm";
 interface ChatRequest {
   message: string;
   model?: ModelId;
+  previousResponseId?: string;
 }
 
 interface ChatResponse {
@@ -34,7 +35,7 @@ export async function POST(
     const model: ModelId =
       body.model && AVAILABLE_MODELS.includes(body.model) ? body.model : "gpt-5.2-2025-12-11";
 
-    const result = await chat(body.message, model);
+    const result = await chat(body.message, model, body.previousResponseId);
 
     return NextResponse.json({
       text: result.text,
