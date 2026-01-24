@@ -14,11 +14,22 @@ import type {
 
 const BASE_URL = "https://www.17lands.com";
 const SESSION_FILE = ".seventeen-lands-session.json";
+const MIN_API_DELAY_MS = 1000; // Minimum delay between API calls
+
+function log(message: string): void {
+  const timestamp = new Date().toISOString().split("T")[1].slice(0, 12);
+  console.log(`[17lands ${timestamp}] ${message}`);
+}
+
+async function sleep(ms: number): Promise<void> {
+  log(`Waiting ${ms}ms...`);
+  await new Promise((r) => setTimeout(r, ms));
+}
 
 async function withRetry<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
-  delayMs: number = 1000
+  delayMs: number = 2000
 ): Promise<T> {
   let lastError: Error | null = null;
 
@@ -30,8 +41,9 @@ async function withRetry<T>(
 
       if (attempt < maxRetries) {
         const delay = delayMs * Math.pow(2, attempt - 1); // Exponential backoff
-        console.log(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
-        await new Promise((r) => setTimeout(r, delay));
+        log(`Attempt ${attempt} failed: ${lastError.message}`);
+        log(`Retrying in ${delay}ms...`);
+        await sleep(delay);
       }
     }
   }
@@ -45,6 +57,7 @@ export class SeventeenLandsClient {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private lastApiCall: number = 0;
 
   constructor(email: string, password: string) {
     if (!email || !password) {
@@ -57,27 +70,29 @@ export class SeventeenLandsClient {
   private async ensureBrowser(): Promise<Page> {
     if (this.page) return this.page;
 
-    console.log("Launching browser...");
+    log("Launching browser...");
     this.browser = await chromium.launch({ headless: true });
 
     // Try to load existing session
     if (existsSync(SESSION_FILE)) {
-      console.log("Loading saved session...");
+      log("Loading saved session...");
       const sessionData = JSON.parse(readFileSync(SESSION_FILE, "utf-8"));
       this.context = await this.browser.newContext({ storageState: sessionData });
     } else {
+      log("No saved session, creating new context");
       this.context = await this.browser.newContext();
     }
 
     this.page = await this.context.newPage();
 
     // Check if session is valid
+    log("Validating session...");
     const isValid = await this.validateSession();
     if (!isValid) {
-      console.log("Session invalid or expired, logging in...");
+      log("Session invalid or expired, logging in...");
       await this.login();
     } else {
-      console.log("Session valid");
+      log("Session valid");
     }
 
     return this.page;
@@ -87,11 +102,16 @@ export class SeventeenLandsClient {
     if (!this.page) return false;
 
     try {
+      log("Navigating to /account to validate session...");
       await this.page.goto(`${BASE_URL}/account`, { waitUntil: "networkidle" });
       const url = this.page.url();
+      log(`Current URL after navigation: ${url}`);
       // If we're redirected to login, session is invalid
-      return !url.includes("/login");
-    } catch {
+      const valid = !url.includes("/login");
+      log(`Session valid: ${valid}`);
+      return valid;
+    } catch (err) {
+      log(`Session validation error: ${err}`);
       return false;
     }
   }
@@ -99,34 +119,56 @@ export class SeventeenLandsClient {
   private async login(): Promise<void> {
     if (!this.page) throw new Error("Browser not initialized");
 
-    console.log("Navigating to login page...");
+    log("Navigating to login page...");
     await this.page.goto(`${BASE_URL}/login`, { waitUntil: "networkidle" });
+    log(`Login page loaded, URL: ${this.page.url()}`);
 
     // Fill login form
-    console.log("Filling login form...");
+    log("Filling login form...");
     await this.page.fill('input[type="email"], input[name="email"]', this.email);
     await this.page.fill('input[type="password"], input[name="password"]', this.password);
+    log("Form filled, submitting...");
 
     // Submit form
     await this.page.click('button[type="submit"]');
 
     // Wait for navigation away from login page
+    log("Waiting for redirect after login...");
     await this.page.waitForURL((url) => !url.toString().includes("/login"), {
       timeout: 30000,
     });
 
-    console.log("Login successful, saving session...");
+    log(`Login successful, redirected to: ${this.page.url()}`);
     await this.saveSession();
   }
 
   private async saveSession(): Promise<void> {
     if (!this.context) return;
+    log("Saving session to disk...");
     const sessionData = await this.context.storageState();
     writeFileSync(SESSION_FILE, JSON.stringify(sessionData, null, 2));
+    log("Session saved");
+  }
+
+  private async enforceRateLimit(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastCall = now - this.lastApiCall;
+    if (timeSinceLastCall < MIN_API_DELAY_MS) {
+      const waitTime = MIN_API_DELAY_MS - timeSinceLastCall;
+      await sleep(waitTime);
+    }
+    this.lastApiCall = Date.now();
   }
 
   private async fetchApi<T>(path: string, retryCount: number = 0): Promise<T> {
     const page = await this.ensureBrowser();
+    const fullUrl = `${BASE_URL}${path}`;
+
+    // Enforce minimum delay between API calls
+    await this.enforceRateLimit();
+
+    log(`API REQUEST: ${path}`);
+    const startTime = Date.now();
 
     try {
       const result = await page.evaluate(async (url: string) => {
@@ -137,36 +179,49 @@ export class SeventeenLandsClient {
           },
         });
 
-        if (response.status === 401 || response.status === 403) {
-          throw new Error(`AUTH_ERROR:${response.status}`);
-        }
+        // Return both status and data for logging
+        const data = response.ok ? await response.json() : null;
+        return {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          data,
+        };
+      }, fullUrl);
 
-        if (response.status === 429) {
-          throw new Error("RATE_LIMITED");
-        }
+      const elapsed = Date.now() - startTime;
+      log(`API RESPONSE: ${result.status} ${result.statusText} (${elapsed}ms)`);
 
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status} ${response.statusText}`);
-        }
+      if (result.status === 401 || result.status === 403) {
+        throw new Error(`AUTH_ERROR:${result.status}`);
+      }
 
-        return response.json();
-      }, `${BASE_URL}${path}`);
+      if (result.status === 429) {
+        throw new Error("RATE_LIMITED");
+      }
 
-      return result as T;
+      if (!result.ok) {
+        throw new Error(`API error: ${result.status} ${result.statusText}`);
+      }
+
+      return result.data as T;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      const elapsed = Date.now() - startTime;
+      log(`API ERROR: ${message} (${elapsed}ms)`);
 
       // Handle auth errors - try re-login once
       if (message.includes("AUTH_ERROR") && retryCount === 0) {
-        console.log("Session expired, re-authenticating...");
+        log("Session expired, re-authenticating...");
         await this.login();
+        await sleep(MIN_API_DELAY_MS); // Wait before retry
         return this.fetchApi<T>(path, retryCount + 1);
       }
 
       // Handle rate limiting
       if (message === "RATE_LIMITED") {
-        console.log("Rate limited, waiting 30 seconds...");
-        await new Promise((r) => setTimeout(r, 30000));
+        log("Rate limited by server, waiting 30 seconds...");
+        await sleep(30000);
         return this.fetchApi<T>(path, retryCount);
       }
 
@@ -175,6 +230,7 @@ export class SeventeenLandsClient {
   }
 
   async getUserData(startDate: string, endDate: string): Promise<SeventeenLandsUserData> {
+    log(`getUserData(${startDate}, ${endDate})`);
     const params = new URLSearchParams({
       start_date: startDate,
       end_date: endDate,
@@ -183,15 +239,18 @@ export class SeventeenLandsClient {
   }
 
   async getDraftDetail(draftId: string): Promise<SeventeenLandsDraftDetail> {
+    log(`getDraftDetail(${draftId})`);
     const params = new URLSearchParams({ draft_id: draftId });
     return withRetry(() => this.fetchApi<SeventeenLandsDraftDetail>(`/data/draft?${params}`));
   }
 
   async getGames(): Promise<SeventeenLandsGameList> {
+    log("getGames()");
     return withRetry(() => this.fetchApi<SeventeenLandsGameList>("/data/user_game_list"));
   }
 
   async getEventDetails(draftId: string): Promise<SeventeenLandsEventDetails> {
+    log(`getEventDetails(${draftId})`);
     const params = new URLSearchParams({ draft_id: draftId });
     return withRetry(() =>
       this.fetchApi<SeventeenLandsEventDetails>(`/data/event_details?${params}`)
@@ -199,6 +258,7 @@ export class SeventeenLandsClient {
   }
 
   async getDeck(draftId: string, deckIndex: number): Promise<SeventeenLandsDeck> {
+    log(`getDeck(${draftId}, ${deckIndex})`);
     const params = new URLSearchParams({
       draft_id: draftId,
       deck_index: deckIndex.toString(),
@@ -207,6 +267,7 @@ export class SeventeenLandsClient {
   }
 
   async close(): Promise<void> {
+    log("Closing browser...");
     if (this.page) {
       await this.page.close();
       this.page = null;
@@ -219,6 +280,7 @@ export class SeventeenLandsClient {
       await this.browser.close();
       this.browser = null;
     }
+    log("Browser closed");
   }
 }
 

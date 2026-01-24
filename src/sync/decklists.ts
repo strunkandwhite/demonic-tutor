@@ -91,21 +91,20 @@ export async function syncDecklists(existingClient?: SeventeenLandsClient): Prom
 
     for (const draftId of draftsToSync) {
       try {
-        console.log(`Fetching decklist for draft ${draftId}...`);
         const deck = await api.getDeck(draftId, 0);
+        const maindeckCount = deck.groups.find((g) => g.name === "Maindeck")?.cards.length || 0;
+        const sideboardCount = deck.groups.find((g) => g.name === "Sideboard")?.cards.length || 0;
         console.log(
-          `  -> ${deck.main_colors} deck, ${deck.groups[0]?.cards.length || 0} maindeck cards`
+          `  Deck: ${deck.main_colors || "?"} colors, ${maindeckCount} maindeck, ${sideboardCount} sideboard`
         );
         await insertDecklist(db, draftId, deck);
         synced++;
-        console.log(`  -> Saved (${synced}/${draftsToSync.length})`);
+        console.log(`  Saved decklist ${synced}/${draftsToSync.length}`);
       } catch (err) {
         failed++;
-        console.error(`Failed to sync decklist for ${draftId}:`, err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error(`  Failed to sync decklist for ${draftId}: ${errMsg}`);
       }
-
-      // Rate limiting
-      await new Promise((r) => setTimeout(r, 2000));
     }
 
     console.log(`Decklist sync complete: ${synced} synced, ${failed} failed`);
