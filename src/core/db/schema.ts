@@ -173,15 +173,15 @@ CREATE INDEX IF NOT EXISTS idx_card_stats_set ON card_stats("set");
 CREATE INDEX IF NOT EXISTS idx_games_draft ON games(draft_id);
 
 CREATE TABLE IF NOT EXISTS decklists (
-  draft_id TEXT PRIMARY KEY REFERENCES drafts(id),
+  draft_id TEXT PRIMARY KEY,
   main_colors TEXT,
   splash_colors TEXT,
   source TEXT DEFAULT 'user'
 );
 
 CREATE TABLE IF NOT EXISTS decklist_cards (
-  draft_id TEXT REFERENCES decklists(draft_id),
-  card_name TEXT REFERENCES cards(name),
+  draft_id TEXT NOT NULL,
+  card_name TEXT NOT NULL,
   quantity INTEGER NOT NULL,
   is_maindeck INTEGER NOT NULL,
   PRIMARY KEY (draft_id, card_name, is_maindeck)
