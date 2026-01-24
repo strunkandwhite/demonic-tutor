@@ -102,7 +102,11 @@ export async function chat(
     throw new Error("OPENAI_API_KEY environment variable is not set");
   }
 
-  const openai = new OpenAI({ apiKey });
+  const openai = new OpenAI({
+    apiKey,
+    timeout: 10 * 60 * 1000, // 10 minutes (reasoning can be slow)
+    maxRetries: 0, // Disable retries to prevent conversation forking
+  });
 
   const instructions = buildInstructions(userContext);
   const response = await openai.responses.create({
@@ -111,7 +115,7 @@ export async function chat(
     ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
     input: message,
     tools,
-    reasoning: { effort: "high" },
+    reasoning: { effort: "medium" },
   });
 
   // Handle tool calls
@@ -153,7 +157,7 @@ export async function chat(
       previous_response_id: currentResponse.id,
       input: toolResults,
       tools,
-      reasoning: { effort: "high" },
+      reasoning: { effort: "medium" },
     });
   }
 
