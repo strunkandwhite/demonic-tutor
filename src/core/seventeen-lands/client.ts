@@ -21,8 +21,11 @@ function log(message: string): void {
   console.log(`[17lands ${timestamp}] ${message}`);
 }
 
-async function sleep(ms: number): Promise<void> {
-  log(`Waiting ${ms}ms...`);
+async function sleep(ms: number, reason?: string): Promise<void> {
+  // Only log significant waits (retries, rate limits) not routine rate limiting
+  if (reason) {
+    log(`Waiting ${ms}ms (${reason})`);
+  }
   await new Promise((r) => setTimeout(r, ms));
 }
 
@@ -42,8 +45,7 @@ async function withRetry<T>(
       if (attempt < maxRetries) {
         const delay = delayMs * Math.pow(2, attempt - 1); // Exponential backoff
         log(`Attempt ${attempt} failed: ${lastError.message}`);
-        log(`Retrying in ${delay}ms...`);
-        await sleep(delay);
+        await sleep(delay, "retry backoff");
       }
     }
   }
@@ -214,14 +216,13 @@ export class SeventeenLandsClient {
       if (message.includes("AUTH_ERROR") && retryCount === 0) {
         log("Session expired, re-authenticating...");
         await this.login();
-        await sleep(MIN_API_DELAY_MS); // Wait before retry
+        await sleep(MIN_API_DELAY_MS, "post-auth delay");
         return this.fetchApi<T>(path, retryCount + 1);
       }
 
       // Handle rate limiting
       if (message === "RATE_LIMITED") {
-        log("Rate limited by server, waiting 30 seconds...");
-        await sleep(30000);
+        await sleep(30000, "rate limited by server");
         return this.fetchApi<T>(path, retryCount);
       }
 

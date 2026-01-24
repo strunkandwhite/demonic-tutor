@@ -164,8 +164,7 @@ async function linkGamesToDrafts(
       // Stop early if all games are linked
       if (unlinkedGameIds.size === 0) break;
 
-      // Rate limiting
-      await new Promise((r) => setTimeout(r, 500));
+      // Note: Rate limiting handled by client.enforceRateLimit()
     } catch (err) {
       console.error(`Failed to get event details for ${draftId}:`, err);
     }
@@ -261,8 +260,7 @@ async function sync() {
 
       syncedSets[draft.expansion] = (syncedSets[draft.expansion] || 0) + 1;
 
-      // Rate limiting - be nice to 17lands (2s between requests)
-      await new Promise((r) => setTimeout(r, 2000));
+      // Note: Rate limiting handled by client.enforceRateLimit()
     }
 
     const summary = Object.entries(syncedSets)
