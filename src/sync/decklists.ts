@@ -5,7 +5,7 @@
 import { config } from "dotenv";
 config({ path: ".env.local", quiet: true });
 import { getClient, closeClient } from "../core/db/client";
-import { createSeventeenLandsClient } from "../core/seventeen-lands";
+import { createSeventeenLandsClient, type SeventeenLandsClient } from "../core/seventeen-lands";
 import type { SeventeenLandsDeck } from "../core/seventeen-lands";
 
 type DbClient = Awaited<ReturnType<typeof getClient>>;
@@ -64,11 +64,12 @@ async function insertDecklist(
   }
 }
 
-export async function syncDecklists(): Promise<void> {
+export async function syncDecklists(existingClient?: SeventeenLandsClient): Promise<void> {
   console.log("Syncing decklists from 17lands...");
 
   const db = await getClient();
-  const api = createSeventeenLandsClient();
+  const api = existingClient ?? createSeventeenLandsClient();
+  const shouldCloseClient = !existingClient;
 
   try {
     // Find drafts without decklists
@@ -90,24 +91,28 @@ export async function syncDecklists(): Promise<void> {
 
     for (const draftId of draftsToSync) {
       try {
-        // Fetch the first deck (index 0) - we don't track deck changes mid-event
+        console.log(`Fetching decklist for draft ${draftId}...`);
         const deck = await api.getDeck(draftId, 0);
+        console.log(
+          `  -> ${deck.main_colors} deck, ${deck.groups[0]?.cards.length || 0} maindeck cards`
+        );
         await insertDecklist(db, draftId, deck);
         synced++;
-
-        process.stdout.write(`\rSynced ${synced}/${draftsToSync.length} decklists`);
+        console.log(`  -> Saved (${synced}/${draftsToSync.length})`);
       } catch (err) {
         failed++;
-        console.error(`\nFailed to sync decklist for ${draftId}:`, err);
+        console.error(`Failed to sync decklist for ${draftId}:`, err);
       }
 
       // Rate limiting
       await new Promise((r) => setTimeout(r, 2000));
     }
 
-    console.log(`\nDecklist sync complete: ${synced} synced, ${failed} failed`);
+    console.log(`Decklist sync complete: ${synced} synced, ${failed} failed`);
   } finally {
-    await api.close();
+    if (shouldCloseClient) {
+      await api.close();
+    }
   }
 }
 

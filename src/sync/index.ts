@@ -288,9 +288,9 @@ async function sync() {
       await augmentCards();
     }
 
-    // Sync decklists from 17lands
+    // Sync decklists from 17lands (reuse existing client)
     if (!dryRun) {
-      await syncDecklists();
+      await syncDecklists(api);
     }
 
     // Update last sync date after successful sync
