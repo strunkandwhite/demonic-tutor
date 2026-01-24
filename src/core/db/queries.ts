@@ -4,6 +4,7 @@
 
 import { getClient } from "./client";
 import type { Draft, Pick, CardStats, Card, Decklist } from "./schema";
+import { deriveArchetypeTags } from "../llm/archetype-tags";
 
 export interface ListDraftsParams {
   set?: string;
@@ -470,9 +471,6 @@ export async function getCardInfo(cardName: string, set: string): Promise<CardIn
   }
 
   const row = result.rows[0];
-
-  // Import deriveArchetypeTags dynamically to avoid circular dependencies
-  const { deriveArchetypeTags } = await import("../llm/archetype-tags");
 
   const typeLine = row.types as string | null;
   const oracleText = row.oracle_text as string | null;
