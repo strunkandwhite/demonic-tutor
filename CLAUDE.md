@@ -4,6 +4,8 @@
 
 Personal MTG Arena draft analytics app that syncs data from 17lands and provides LLM-powered chat queries.
 
+**Single-user app with one Turso database.** No migration versioning needed - `schema.ts` is the source of truth and `db:migrate` just runs `CREATE TABLE IF NOT EXISTS` statements.
+
 ## Tech Stack
 
 - **Framework**: Next.js 16 with App Router

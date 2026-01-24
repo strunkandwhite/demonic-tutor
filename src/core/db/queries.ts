@@ -571,6 +571,7 @@ export async function getTrophyDecklists(
     sql: `SELECT draft_id, main_colors, splash_colors
           FROM decklists
           WHERE ${conditions.join(" AND ")}
+          ORDER BY draft_id DESC
           LIMIT ?`,
     args,
   });
