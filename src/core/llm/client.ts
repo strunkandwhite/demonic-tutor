@@ -42,8 +42,8 @@ When critiquing picks or analyzing a draft, provide BOTH human-readable commenta
   "issues": [
     {
       "id": "issue-1",
-      "category": "draft_navigation" | "card_evaluation" | "deck_construction",
-      "severity": "low" | "medium" | "high",
+      "category": "draft_navigation",  // or "card_evaluation" or "deck_construction"
+      "severity": "medium",  // or "low" or "high"
       "evidence": {
         "pick": "P1P5",
         "picked": "Card Name",
@@ -67,7 +67,7 @@ When the decklist is available and you're analyzing deck construction, also incl
   "curve": { "one": 2, "two": 6, "three": 5, "four": 4, "five_plus": 3 },
   "removal_count": 3,
   "fixing_count": 2,
-  "splash_risk": { "level": "low" | "medium" | "high", "reasons": ["reason 1"] },
+  "splash_risk": { "level": "medium", "reasons": ["reason 1"] },  // level: "low" | "medium" | "high"
   "suggested_cuts": [{ "card_name": "Card", "reason": "Why cut" }],
   "suggested_adds": [{ "card_name": "Card", "reason": "Why add" }]
 }
