@@ -137,6 +137,12 @@ export async function syncFormatStats(
 ): Promise<void> {
   const now = new Date().toISOString();
 
+  // Calculate date range for API calls (last 30 days)
+  const endDate = new Date().toISOString().split("T")[0];
+  const startDateObj = new Date();
+  startDateObj.setDate(startDateObj.getDate() - 30);
+  const startDate = startDateObj.toISOString().split("T")[0];
+
   // 1. Sync play/draw stats (every sync)
   console.log("Syncing play/draw stats...");
   const playDrawStats = await api.getPlayDrawStats();
@@ -182,90 +188,97 @@ export async function syncFormatStats(
 
   // 2. For each set: color ratings + trophy decks
   for (const set of userSets) {
-    // Check if already updated today
-    if (!dryRun && (await wasColorStatsUpdatedToday(db, set))) {
-      console.log(`Skipping ${set} - color stats already updated today`);
-      continue;
-    }
-
-    console.log(`Syncing format stats for ${set}...`);
-
-    // Fetch color ratings
-    const colorRatings = await api.getColorRatings(set);
-    console.log(`  Found ${colorRatings.length} color ratings`);
-
-    if (dryRun) {
-      console.log(`  Color ratings for ${set}:`);
-      for (const rating of colorRatings.slice(0, 5)) {
-        const winRate = rating.games > 0 ? ((rating.wins / rating.games) * 100).toFixed(1) : "N/A";
-        console.log(
-          `    - ${rating.color_name} (${rating.short_name}): ${winRate}% WR (${rating.games} games)`
-        );
+    try {
+      // Check if already updated today
+      if (!dryRun && (await wasColorStatsUpdatedToday(db, set))) {
+        console.log(`Skipping ${set} - color stats already updated today`);
+        continue;
       }
-      if (colorRatings.length > 5) {
-        console.log(`    ... and ${colorRatings.length - 5} more`);
-      }
-    } else {
-      for (const rating of colorRatings) {
-        await db.execute({
-          sql: `INSERT INTO format_color_stats ("set", event_type, color_code, color_name, wins, games, is_summary, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT("set", event_type, color_code) DO UPDATE SET
-                  color_name = excluded.color_name,
-                  wins = excluded.wins,
-                  games = excluded.games,
-                  is_summary = excluded.is_summary,
-                  updated_at = excluded.updated_at`,
-          args: [
-            set,
-            "PremierDraft", // Default event type for color ratings
-            String(rating.short_name),
-            rating.color_name,
-            rating.wins,
-            rating.games,
-            rating.is_summary ? 1 : 0,
-            now,
-          ],
-        });
-      }
-      console.log(`[turso] Upserted ${colorRatings.length} color ratings for ${set}`);
-    }
 
-    // Fetch trophy decks
-    const trophyDecks = await api.getTrophyDecks(set);
-    console.log(`  Found ${trophyDecks.length} trophy decks`);
+      console.log(`Syncing format stats for ${set}...`);
 
-    // Select diverse subset
-    const selectedDecks = selectDiverseTrophyDecks(trophyDecks);
-    console.log(`  Selected ${selectedDecks.length} diverse trophy decks`);
+      // Fetch color ratings
+      const colorRatings = await api.getColorRatings(set, "PremierDraft", startDate, endDate);
+      console.log(`  Found ${colorRatings.length} color ratings`);
 
-    if (dryRun) {
-      // Count by color pair for summary
-      const colorCounts = new Map<string, number>();
-      for (const deck of selectedDecks) {
-        const colors = extractMainColors(deck.colors);
-        colorCounts.set(colors, (colorCounts.get(colors) || 0) + 1);
-      }
-      console.log(`  Trophy decks by color pair:`);
-      for (const [colors, count] of colorCounts) {
-        console.log(`    - ${colors}: ${count}`);
-      }
-    } else {
-      // Fetch and insert each trophy decklist
-      let synced = 0;
-      let failed = 0;
-      for (const trophyDeck of selectedDecks) {
-        try {
-          const deck = await api.getDeck(trophyDeck.aggregate_id, trophyDeck.deck_index);
-          await insertTrophyDecklist(db, trophyDeck.aggregate_id, deck);
-          synced++;
-        } catch (err) {
-          failed++;
-          const errMsg = err instanceof Error ? err.message : String(err);
-          console.error(`  Failed to sync trophy deck ${trophyDeck.aggregate_id}: ${errMsg}`);
+      if (dryRun) {
+        console.log(`  Color ratings for ${set}:`);
+        for (const rating of colorRatings.slice(0, 5)) {
+          const winRate =
+            rating.games > 0 ? ((rating.wins / rating.games) * 100).toFixed(1) : "N/A";
+          console.log(
+            `    - ${rating.color_name} (${rating.short_name}): ${winRate}% WR (${rating.games} games)`
+          );
         }
+        if (colorRatings.length > 5) {
+          console.log(`    ... and ${colorRatings.length - 5} more`);
+        }
+      } else {
+        for (const rating of colorRatings) {
+          await db.execute({
+            sql: `INSERT INTO format_color_stats ("set", event_type, color_code, color_name, wins, games, is_summary, updated_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                  ON CONFLICT("set", event_type, color_code) DO UPDATE SET
+                    color_name = excluded.color_name,
+                    wins = excluded.wins,
+                    games = excluded.games,
+                    is_summary = excluded.is_summary,
+                    updated_at = excluded.updated_at`,
+            args: [
+              set,
+              "PremierDraft", // Default event type for color ratings
+              String(rating.short_name),
+              rating.color_name,
+              rating.wins,
+              rating.games,
+              rating.is_summary ? 1 : 0,
+              now,
+            ],
+          });
+        }
+        console.log(`[turso] Upserted ${colorRatings.length} color ratings for ${set}`);
       }
-      console.log(`[turso] Synced ${synced} trophy decklists for ${set} (${failed} failed)`);
+
+      // Fetch trophy decks
+      const trophyDecks = await api.getTrophyDecks(set, "PremierDraft");
+      console.log(`  Found ${trophyDecks.length} trophy decks`);
+
+      // Select diverse subset
+      const selectedDecks = selectDiverseTrophyDecks(trophyDecks);
+      console.log(`  Selected ${selectedDecks.length} diverse trophy decks`);
+
+      if (dryRun) {
+        // Count by color pair for summary
+        const colorCounts = new Map<string, number>();
+        for (const deck of selectedDecks) {
+          const colors = extractMainColors(deck.colors);
+          colorCounts.set(colors, (colorCounts.get(colors) || 0) + 1);
+        }
+        console.log(`  Trophy decks by color pair:`);
+        for (const [colors, count] of colorCounts) {
+          console.log(`    - ${colors}: ${count}`);
+        }
+      } else {
+        // Fetch and insert each trophy decklist
+        let synced = 0;
+        let failed = 0;
+        for (const trophyDeck of selectedDecks) {
+          try {
+            const deck = await api.getDeck(trophyDeck.aggregate_id, trophyDeck.deck_index);
+            await insertTrophyDecklist(db, trophyDeck.aggregate_id, deck);
+            synced++;
+          } catch (err) {
+            failed++;
+            const errMsg = err instanceof Error ? err.message : String(err);
+            console.error(`  Failed to sync trophy deck ${trophyDeck.aggregate_id}: ${errMsg}`);
+          }
+        }
+        console.log(`[turso] Synced ${synced} trophy decklists for ${set} (${failed} failed)`);
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.warn(`Skipping format stats for ${set}: ${errMsg}`);
+      continue;
     }
   }
 

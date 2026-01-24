@@ -12,6 +12,7 @@ import type {
   SeventeenLandsDeck,
   SeventeenLandsColorRating,
   SeventeenLandsPlayDrawStats,
+  SeventeenLandsPlayDrawResponse,
   SeventeenLandsTrophyDeck,
 } from "./types";
 
@@ -362,7 +363,10 @@ export class SeventeenLandsClient {
 
   async getPlayDrawStats(): Promise<SeventeenLandsPlayDrawStats[]> {
     log("getPlayDrawStats()");
-    return withRetry(() => this.fetchApi<SeventeenLandsPlayDrawStats[]>("/data/play_draw"));
+    const response = await withRetry(() =>
+      this.fetchApi<SeventeenLandsPlayDrawResponse>("/data/play_draw")
+    );
+    return response.data;
   }
 
   async getTrophyDecks(expansion: string, eventType?: string): Promise<SeventeenLandsTrophyDeck[]> {

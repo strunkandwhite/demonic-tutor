@@ -162,6 +162,14 @@ export interface SeventeenLandsPlayDrawStats {
 }
 
 /**
+ * Wrapper for play/draw API response.
+ * The /data/play_draw endpoint returns { data: [...] } not just an array.
+ */
+export interface SeventeenLandsPlayDrawResponse {
+  data: SeventeenLandsPlayDrawStats[];
+}
+
+/**
  * Trophy deck (7-win) from 17lands leaderboard.
  */
 export interface SeventeenLandsTrophyDeck {
