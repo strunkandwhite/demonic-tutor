@@ -3,18 +3,20 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { chat, AVAILABLE_MODELS, type ModelId } from "@/core/llm";
+import { chat, AVAILABLE_MODELS, type ModelId, type UserContext } from "@/core/llm";
 
 interface ChatRequest {
   message: string;
   model?: ModelId;
   previousResponseId?: string;
+  userContext?: UserContext;
 }
 
 interface ChatResponse {
   text: string;
   responseId: string;
   model: string;
+  userContext?: UserContext;
 }
 
 interface ErrorResponse {
@@ -35,12 +37,13 @@ export async function POST(
     const model: ModelId =
       body.model && AVAILABLE_MODELS.includes(body.model) ? body.model : "gpt-5.2-2025-12-11";
 
-    const result = await chat(body.message, model, body.previousResponseId);
+    const result = await chat(body.message, model, body.previousResponseId, body.userContext);
 
     return NextResponse.json({
       text: result.text,
       responseId: result.responseId,
       model: result.model,
+      userContext: result.userContext,
     });
   } catch (error) {
     console.error("Chat API error:", error);

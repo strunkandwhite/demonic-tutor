@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { deriveArchetypeTags } from "./archetype-tags";
+import { tools, isValidToolName } from "./tools";
+import { executeToolCall } from "./handlers";
 
 describe("deriveArchetypeTags", () => {
   describe("creature type extraction", () => {
@@ -106,6 +108,120 @@ describe("deriveArchetypeTags", () => {
       );
       const removalCount = tags.filter((t) => t === "Removal").length;
       expect(removalCount).toBe(1);
+    });
+  });
+});
+
+describe("set_user_context tool", () => {
+  describe("tool definition", () => {
+    it("exists in tools array", () => {
+      const tool = tools.find((t) => t.type === "function" && t.name === "set_user_context");
+      expect(tool).toBeDefined();
+    });
+
+    it("has correct parameter schema", () => {
+      const tool = tools.find(
+        (t) => t.type === "function" && t.name === "set_user_context"
+      ) as Extract<(typeof tools)[number], { type: "function" }>;
+      expect(tool).toBeDefined();
+
+      const params = tool.parameters as Record<string, unknown>;
+      expect(params.required).toContain("intent");
+
+      const properties = params.properties as Record<string, unknown>;
+      const intent = properties.intent as Record<string, unknown>;
+      const intentProps = intent.properties as Record<string, unknown>;
+
+      expect(intentProps.mode).toBeDefined();
+      expect(intentProps.forced_archetype).toBeDefined();
+      expect(intentProps.constraints).toBeDefined();
+    });
+
+    it("includes all mode options", () => {
+      const tool = tools.find(
+        (t) => t.type === "function" && t.name === "set_user_context"
+      ) as Extract<(typeof tools)[number], { type: "function" }>;
+
+      const params = tool.parameters as Record<string, unknown>;
+      const properties = params.properties as Record<string, unknown>;
+      const intent = properties.intent as Record<string, unknown>;
+      const intentProps = intent.properties as Record<string, unknown>;
+      const mode = intentProps.mode as Record<string, unknown>;
+
+      expect(mode.enum).toEqual([
+        "maximize_wins",
+        "learn_signals",
+        "force_archetype",
+        "rare_draft",
+        "experiment",
+      ]);
+    });
+  });
+
+  describe("isValidToolName", () => {
+    it("returns true for set_user_context", () => {
+      expect(isValidToolName("set_user_context")).toBe(true);
+    });
+
+    it("returns false for invalid tool names", () => {
+      expect(isValidToolName("invalid_tool")).toBe(false);
+    });
+  });
+
+  describe("executeToolCall", () => {
+    it("returns ok: true and userContext for set_user_context", async () => {
+      const args = {
+        intent: {
+          mode: "maximize_wins",
+          forced_archetype: null,
+          constraints: ["avoid_blue"],
+        },
+      };
+
+      const result = await executeToolCall("set_user_context", args);
+
+      expect(JSON.parse(result.output)).toEqual({ ok: true });
+      expect(result.userContext).toEqual({
+        intent: {
+          mode: "maximize_wins",
+          forced_archetype: null,
+          constraints: ["avoid_blue"],
+        },
+      });
+    });
+
+    it("handles force_archetype mode with archetype set", async () => {
+      const args = {
+        intent: {
+          mode: "force_archetype",
+          forced_archetype: "WG Kithkin",
+          constraints: ["splash_ok"],
+        },
+      };
+
+      const result = await executeToolCall("set_user_context", args);
+
+      expect(result.userContext).toEqual({
+        intent: {
+          mode: "force_archetype",
+          forced_archetype: "WG Kithkin",
+          constraints: ["splash_ok"],
+        },
+      });
+    });
+
+    it("handles empty constraints array", async () => {
+      const args = {
+        intent: {
+          mode: "learn_signals",
+          forced_archetype: null,
+          constraints: [],
+        },
+      };
+
+      const result = await executeToolCall("set_user_context", args);
+
+      expect(result.userContext?.intent.constraints).toEqual([]);
     });
   });
 });

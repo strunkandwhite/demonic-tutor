@@ -4,6 +4,19 @@
 
 import type OpenAI from "openai";
 
+/**
+ * User intent/context for session persistence.
+ */
+export interface UserIntent {
+  mode: "maximize_wins" | "learn_signals" | "force_archetype" | "rare_draft" | "experiment";
+  forced_archetype: string | null;
+  constraints: string[];
+}
+
+export interface UserContext {
+  intent: UserIntent;
+}
+
 export const tools: OpenAI.Responses.Tool[] = [
   {
     type: "function",
@@ -153,6 +166,50 @@ export const tools: OpenAI.Responses.Tool[] = [
     },
     strict: false,
   },
+  {
+    type: "function",
+    name: "set_user_context",
+    description:
+      "Set the user's drafting intent and preferences for the session. Call this when the user expresses a specific goal or constraint for their drafts.",
+    parameters: {
+      type: "object",
+      properties: {
+        intent: {
+          type: "object",
+          description: "The user's drafting intent",
+          properties: {
+            mode: {
+              type: "string",
+              enum: [
+                "maximize_wins",
+                "learn_signals",
+                "force_archetype",
+                "rare_draft",
+                "experiment",
+              ],
+              description:
+                "maximize_wins: optimize for trophy rate; learn_signals: focus on reading signals and staying open; force_archetype: commit to a specific archetype; rare_draft: prioritize collecting rares; experiment: try new strategies regardless of win rate",
+            },
+            forced_archetype: {
+              type: "string",
+              nullable: true,
+              description:
+                "Archetype to force (e.g., 'WG Kithkin', 'UB Faeries'). Only relevant when mode is force_archetype.",
+            },
+            constraints: {
+              type: "array",
+              items: { type: "string" },
+              description:
+                "Additional constraints (e.g., 'avoid_blue', 'splash_ok', 'prioritize_2_drops')",
+            },
+          },
+          required: ["mode", "constraints"],
+        },
+      },
+      required: ["intent"],
+    },
+    strict: false,
+  },
 ];
 
 export type ToolName =
@@ -165,7 +222,8 @@ export type ToolName =
   | "get_deck"
   | "search_decks"
   | "analyze_deck_choices"
-  | "get_card_info";
+  | "get_card_info"
+  | "set_user_context";
 
 export function isValidToolName(name: string): name is ToolName {
   return [
@@ -179,5 +237,6 @@ export function isValidToolName(name: string): name is ToolName {
     "search_decks",
     "analyze_deck_choices",
     "get_card_info",
+    "set_user_context",
   ].includes(name);
 }
