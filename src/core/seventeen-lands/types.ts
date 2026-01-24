@@ -129,7 +129,7 @@ export interface SeventeenLandsDeck {
  * Color rating stats from 17lands expansion endpoint.
  * Shows win rates by color combination for a format.
  */
-export interface ColorRating {
+export interface SeventeenLandsColorRating {
   /** Whether this is a summary row (e.g., "Two-color") vs specific combo (e.g., "Azorius") */
   is_summary: boolean;
   /** Full color name like "Azorius (WU)" or "Two-color" */
@@ -146,7 +146,7 @@ export interface ColorRating {
  * Play/draw statistics from 17lands.
  * Shows win rate advantage when playing first and game length distribution.
  */
-export interface PlayDrawStats {
+export interface SeventeenLandsPlayDrawStats {
   /** Set code like "AFR", "STX" */
   expansion: string;
   /** Event type like "PremierDraft", "QuickDraft", "Sealed" */
@@ -164,7 +164,7 @@ export interface PlayDrawStats {
 /**
  * Trophy deck (7-win) from 17lands leaderboard.
  */
-export interface TrophyDeck {
+export interface SeventeenLandsTrophyDeck {
   /** Unique ID for the draft aggregate */
   aggregate_id: string;
   /** Color combination like "WU", "BG", "URwb" (lowercase = splash) */
