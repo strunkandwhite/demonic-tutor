@@ -435,3 +435,55 @@ export async function analyzeDeckChoices(draftId: string): Promise<DeckChoiceAna
     sideboard_analysis: sideboardAnalysis,
   };
 }
+
+export interface CardInfo {
+  name: string;
+  mana_cost: string | null;
+  colors: string | null;
+  type_line: string | null;
+  rules_text: string | null;
+  rarity: string | null;
+  archetype_tags: string[];
+}
+
+export async function getCardInfo(cardName: string, set: string): Promise<CardInfo | null> {
+  const db = await getClient();
+
+  // First verify the card exists in this set via card_stats
+  const statsCheck = await db.execute({
+    sql: 'SELECT card_name FROM card_stats WHERE card_name = ? AND "set" = ?',
+    args: [cardName, set],
+  });
+
+  if (statsCheck.rows.length === 0) {
+    return null;
+  }
+
+  // Get card details from cards table
+  const result = await db.execute({
+    sql: "SELECT name, mana_cost, colors, types, oracle_text, rarity FROM cards WHERE name = ?",
+    args: [cardName],
+  });
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  const row = result.rows[0];
+
+  // Import deriveArchetypeTags dynamically to avoid circular dependencies
+  const { deriveArchetypeTags } = await import("../llm/archetype-tags");
+
+  const typeLine = row.types as string | null;
+  const oracleText = row.oracle_text as string | null;
+
+  return {
+    name: row.name as string,
+    mana_cost: row.mana_cost as string | null,
+    colors: row.colors as string | null,
+    type_line: typeLine,
+    rules_text: oracleText,
+    rarity: row.rarity as string | null,
+    archetype_tags: deriveArchetypeTags(typeLine, oracleText),
+  };
+}

@@ -138,6 +138,21 @@ export const tools: OpenAI.Responses.Tool[] = [
     },
     strict: false,
   },
+  {
+    type: "function",
+    name: "get_card_info",
+    description:
+      "Get oracle text and derived archetype tags for a card to reason about synergies and evaluations",
+    parameters: {
+      type: "object",
+      properties: {
+        card_name: { type: "string", description: "Card name" },
+        set: { type: "string", description: "Set code" },
+      },
+      required: ["card_name", "set"],
+    },
+    strict: false,
+  },
 ];
 
 export type ToolName =
@@ -149,7 +164,8 @@ export type ToolName =
   | "get_format_top_cards"
   | "get_deck"
   | "search_decks"
-  | "analyze_deck_choices";
+  | "analyze_deck_choices"
+  | "get_card_info";
 
 export function isValidToolName(name: string): name is ToolName {
   return [
@@ -162,5 +178,6 @@ export function isValidToolName(name: string): name is ToolName {
     "get_deck",
     "search_decks",
     "analyze_deck_choices",
+    "get_card_info",
   ].includes(name);
 }

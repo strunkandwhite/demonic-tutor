@@ -12,6 +12,7 @@ import {
   getDeck,
   searchDecks,
   analyzeDeckChoices,
+  getCardInfo,
 } from "../db/queries";
 import type { ToolName } from "./tools";
 
@@ -57,6 +58,9 @@ export async function executeToolCall(
 
     case "analyze_deck_choices":
       return JSON.stringify(await analyzeDeckChoices(args.draft_id as string));
+
+    case "get_card_info":
+      return JSON.stringify(await getCardInfo(args.card_name as string, args.set as string));
 
     default:
       throw new Error(`Unknown tool: ${name}`);
