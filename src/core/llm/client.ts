@@ -28,7 +28,7 @@ When critiquing a draft, follow these steps in order:
 
 1. **Fetch the draft**: Use \`list_drafts\` with limit:1 to get the most recent, or ask which draft to analyze.
 2. **Fetch picks**: Use \`get_draft\` to retrieve all picks with pack contents.
-3. **Fetch deck if available**: Use \`get_deck\` if the tool exists and decklist is requested.
+3. **Fetch deck if requested**: Use \`get_deck\` to retrieve the final decklist if the user wants deck construction feedback.
 4. **Establish intent**: If user context is missing, ask the clarifying question above before proceeding.
 5. **Compute signals and pivots**: Identify when color commitment happened. Track signal strength pack by pack.
 6. **Evaluate mistakes**: Categorize issues as draft_navigation, card_evaluation, or deck_construction.
