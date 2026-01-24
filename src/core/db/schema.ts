@@ -68,6 +68,29 @@ export interface Decklist {
   draft_id: string;
   main_colors: string | null;
   splash_colors: string | null;
+  source: string; // 'user' or 'trophy'
+}
+
+export interface FormatColorStats {
+  id: number;
+  set: string;
+  event_type: string;
+  color_code: string;
+  color_name: string;
+  wins: number;
+  games: number;
+  is_summary: number; // 1 = summary row (e.g., "All Decks"), 0 = color pair
+  updated_at: string;
+}
+
+export interface FormatPlayDraw {
+  id: number;
+  set: string;
+  event_type: string;
+  avg_game_length: number;
+  play_win_rate: number;
+  sample_size: number;
+  updated_at: string;
 }
 
 export interface DecklistCard {
@@ -152,7 +175,8 @@ CREATE INDEX IF NOT EXISTS idx_games_draft ON games(draft_id);
 CREATE TABLE IF NOT EXISTS decklists (
   draft_id TEXT PRIMARY KEY REFERENCES drafts(id),
   main_colors TEXT,
-  splash_colors TEXT
+  splash_colors TEXT,
+  source TEXT DEFAULT 'user'
 );
 
 CREATE TABLE IF NOT EXISTS decklist_cards (
@@ -165,4 +189,31 @@ CREATE TABLE IF NOT EXISTS decklist_cards (
 
 CREATE INDEX IF NOT EXISTS idx_decklist_cards_card ON decklist_cards(card_name);
 CREATE INDEX IF NOT EXISTS idx_decklist_cards_draft ON decklist_cards(draft_id);
+
+CREATE TABLE IF NOT EXISTS format_color_stats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  "set" TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  color_code TEXT NOT NULL,
+  color_name TEXT NOT NULL,
+  wins INTEGER NOT NULL,
+  games INTEGER NOT NULL,
+  is_summary INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  UNIQUE("set", event_type, color_code)
+);
+
+CREATE TABLE IF NOT EXISTS format_play_draw (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  "set" TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  avg_game_length REAL NOT NULL,
+  play_win_rate REAL NOT NULL,
+  sample_size INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE("set", event_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_format_color_stats_set ON format_color_stats("set");
+CREATE INDEX IF NOT EXISTS idx_format_play_draw_set ON format_play_draw("set");
 `;

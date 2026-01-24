@@ -11,6 +11,8 @@ const MIGRATIONS = [
   // 001: Add orphaned tracking columns
   "ALTER TABLE games ADD COLUMN orphaned INTEGER DEFAULT 0",
   "ALTER TABLE cards ADD COLUMN scryfall_not_found INTEGER DEFAULT 0",
+  // 002: Add source column to decklists for trophy deck support
+  "ALTER TABLE decklists ADD COLUMN source TEXT DEFAULT 'user'",
 ];
 
 async function migrate() {
