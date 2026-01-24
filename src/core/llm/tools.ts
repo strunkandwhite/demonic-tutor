@@ -210,6 +210,45 @@ export const tools: OpenAI.Responses.Tool[] = [
     },
     strict: false,
   },
+  {
+    type: "function",
+    name: "get_format_meta",
+    description:
+      "Get format metagame data including win rates by color pair and play/draw statistics",
+    parameters: {
+      type: "object",
+      properties: {
+        set: { type: "string", description: "Set code (e.g., FIN, DSK)" },
+        event_type: {
+          type: "string",
+          description: "Event type (default: PremierDraft)",
+        },
+      },
+      required: ["set"],
+    },
+    strict: false,
+  },
+  {
+    type: "function",
+    name: "get_trophy_decks",
+    description: "Get trophy (7-x) decklists from 17lands for a format",
+    parameters: {
+      type: "object",
+      properties: {
+        set: { type: "string", description: "Set code (e.g., FIN, DSK)" },
+        colors: {
+          type: "string",
+          description: "Filter by color pair (e.g., UB, WG)",
+        },
+        limit: {
+          type: "integer",
+          description: "Max number of decklists to return (default: 5)",
+        },
+      },
+      required: ["set"],
+    },
+    strict: false,
+  },
 ];
 
 export type ToolName =
@@ -223,7 +262,9 @@ export type ToolName =
   | "search_decks"
   | "analyze_deck_choices"
   | "get_card_info"
-  | "set_user_context";
+  | "set_user_context"
+  | "get_format_meta"
+  | "get_trophy_decks";
 
 export function isValidToolName(name: string): name is ToolName {
   return [
@@ -238,5 +279,7 @@ export function isValidToolName(name: string): name is ToolName {
     "analyze_deck_choices",
     "get_card_info",
     "set_user_context",
+    "get_format_meta",
+    "get_trophy_decks",
   ].includes(name);
 }

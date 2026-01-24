@@ -13,6 +13,9 @@ import {
   searchDecks,
   analyzeDeckChoices,
   getCardInfo,
+  getFormatColorStats,
+  getFormatPlayDraw,
+  getTrophyDecklists,
 } from "../db/queries";
 import type { ToolName, UserContext } from "./tools";
 
@@ -84,6 +87,29 @@ export async function executeToolCall(
         output: JSON.stringify({ ok: true }),
         userContext,
       };
+    }
+
+    case "get_format_meta": {
+      const set = args.set as string;
+      const eventType = (args.event_type as string | undefined) ?? "PremierDraft";
+      const [colorStats, playDraw] = await Promise.all([
+        getFormatColorStats(set, eventType),
+        getFormatPlayDraw(set, eventType),
+      ]);
+      return {
+        output: JSON.stringify({
+          color_stats: colorStats,
+          play_draw: playDraw,
+        }),
+      };
+    }
+
+    case "get_trophy_decks": {
+      const set = args.set as string;
+      const colors = args.colors as string | undefined;
+      const limit = (args.limit as number | undefined) ?? 5;
+      const decklists = await getTrophyDecklists(set, colors, limit);
+      return { output: JSON.stringify(decklists) };
     }
 
     default:
