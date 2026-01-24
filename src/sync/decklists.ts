@@ -90,14 +90,9 @@ export async function syncDecklists(): Promise<void> {
 
     for (const draftId of draftsToSync) {
       try {
-        // Fetch deck_index=0 to discover version count
+        // Fetch the first deck (index 0) - we don't track deck changes mid-event
         const deck = await api.getDeck(draftId, 0);
-        const finalIndex = deck.event_info.deck_links.length - 1;
-
-        // Fetch final deck if different
-        const finalDeck = finalIndex > 0 ? await api.getDeck(draftId, finalIndex) : deck;
-
-        await insertDecklist(db, draftId, finalDeck);
+        await insertDecklist(db, draftId, deck);
         synced++;
 
         process.stdout.write(`\rSynced ${synced}/${draftsToSync.length} decklists`);
