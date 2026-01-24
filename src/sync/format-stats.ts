@@ -7,12 +7,7 @@ import type {
   SeventeenLandsTrophyDeck,
   SeventeenLandsDeck,
 } from "../core/seventeen-lands";
-
-type DbClient = {
-  execute: (
-    sql: string | { sql: string; args: unknown[] }
-  ) => Promise<{ rows: Record<string, unknown>[] }>;
-};
+import type { Client as DbClient } from "../core/db/client";
 
 /**
  * Extract main colors from trophy deck color string.

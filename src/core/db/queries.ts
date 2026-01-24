@@ -3,7 +3,15 @@
  */
 
 import { getClient } from "./client";
-import type { Draft, Pick, CardStats, Card, Decklist } from "./schema";
+import type {
+  Draft,
+  Pick,
+  CardStats,
+  Card,
+  Decklist,
+  FormatColorStats,
+  FormatPlayDraw,
+} from "./schema";
 import { deriveArchetypeTags } from "../llm/archetype-tags";
 
 export interface ListDraftsParams {
@@ -485,4 +493,129 @@ export async function getCardInfo(cardName: string, set: string): Promise<CardIn
     rarity: row.rarity as string | null,
     archetype_tags: deriveArchetypeTags(typeLine, oracleText),
   };
+}
+
+export async function getFormatColorStats(
+  set: string,
+  eventType?: string
+): Promise<FormatColorStats[]> {
+  const db = await getClient();
+  const conditions: string[] = ['"set" = ?'];
+  const args: (string | number)[] = [set];
+
+  if (eventType) {
+    conditions.push("event_type = ?");
+    args.push(eventType);
+  }
+
+  const result = await db.execute({
+    sql: `SELECT * FROM format_color_stats
+          WHERE ${conditions.join(" AND ")}
+          ORDER BY is_summary DESC, wins * 1.0 / NULLIF(games, 0) DESC`,
+    args,
+  });
+
+  return result.rows as unknown as FormatColorStats[];
+}
+
+export async function getFormatPlayDraw(
+  set: string,
+  eventType?: string
+): Promise<FormatPlayDraw | null> {
+  const db = await getClient();
+  const conditions: string[] = ['"set" = ?'];
+  const args: (string | number)[] = [set];
+
+  if (eventType) {
+    conditions.push("event_type = ?");
+    args.push(eventType);
+  }
+
+  const result = await db.execute({
+    sql: `SELECT * FROM format_play_draw
+          WHERE ${conditions.join(" AND ")}
+          LIMIT 1`,
+    args,
+  });
+
+  return (result.rows[0] as unknown as FormatPlayDraw) || null;
+}
+
+export interface TrophyDecklist {
+  draft_id: string;
+  main_colors: string | null;
+  splash_colors: string | null;
+  cards: Array<{ card_name: string; quantity: number; is_maindeck: boolean }>;
+}
+
+export async function getTrophyDecklists(
+  set: string,
+  colors?: string,
+  limit: number = 10
+): Promise<TrophyDecklist[]> {
+  const db = await getClient();
+
+  // Build conditions for decklists
+  const conditions: string[] = ["dl.source = ?", 'd."set" = ?'];
+  const args: (string | number)[] = ["trophy", set];
+
+  if (colors) {
+    conditions.push("dl.main_colors = ?");
+    args.push(colors);
+  }
+
+  args.push(limit);
+
+  // Get trophy decklists
+  const decklistsResult = await db.execute({
+    sql: `SELECT dl.draft_id, dl.main_colors, dl.splash_colors
+          FROM decklists dl
+          JOIN drafts d ON dl.draft_id = d.id
+          WHERE ${conditions.join(" AND ")}
+          ORDER BY d.draft_date DESC
+          LIMIT ?`,
+    args,
+  });
+
+  if (decklistsResult.rows.length === 0) {
+    return [];
+  }
+
+  // Get all draft IDs
+  const draftIds = decklistsResult.rows.map((r) => r.draft_id as string);
+
+  // Get cards for all these decklists
+  const placeholders = draftIds.map(() => "?").join(", ");
+  const cardsResult = await db.execute({
+    sql: `SELECT draft_id, card_name, quantity, is_maindeck
+          FROM decklist_cards
+          WHERE draft_id IN (${placeholders})`,
+    args: draftIds,
+  });
+
+  // Group cards by draft_id
+  const cardsByDraft = new Map<
+    string,
+    Array<{ card_name: string; quantity: number; is_maindeck: boolean }>
+  >();
+
+  for (const row of cardsResult.rows) {
+    const draftId = row.draft_id as string;
+    if (!cardsByDraft.has(draftId)) {
+      cardsByDraft.set(draftId, []);
+    }
+    cardsByDraft.get(draftId)!.push({
+      card_name: row.card_name as string,
+      quantity: row.quantity as number,
+      is_maindeck: row.is_maindeck === 1,
+    });
+  }
+
+  // Build result
+  return decklistsResult.rows.map((r) => ({
+    draft_id: r.draft_id as string,
+    main_colors: r.main_colors as string | null,
+    splash_colors: r.splash_colors as string | null,
+    cards: cardsByDraft.get(r.draft_id as string) || [],
+  }));
 }

@@ -10,6 +10,7 @@ import type { SeventeenLandsDraftDetail } from "../core/seventeen-lands";
 import { getSyncMetadata, setSyncMetadata } from "../core/db/queries";
 import { augmentCards } from "../augment";
 import { syncDecklists } from "./decklists";
+import { syncFormatStats } from "./format-stats";
 
 const INITIAL_START_DATE = "2026-01-06";
 
@@ -304,6 +305,9 @@ async function sync() {
     if (!dryRun) {
       await syncDecklists(api);
     }
+
+    // Sync format stats from 17lands
+    await syncFormatStats(api, db, dryRun);
 
     // Update last sync date after successful sync
     const today = new Date().toISOString().split("T")[0];
