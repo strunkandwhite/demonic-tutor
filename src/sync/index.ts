@@ -108,7 +108,7 @@ async function syncGames(
     inserted++;
   }
 
-  console.log(`Synced ${inserted} games`);
+  console.log(`[turso] Inserted ${inserted} games`);
 }
 
 export function parseGameIdFromS3Path(s3Path: string): string | null {
@@ -122,9 +122,9 @@ async function linkGamesToDrafts(
   api: ReturnType<typeof createSeventeenLandsClient>,
   draftIds: Set<string>
 ) {
-  // Only process if there are unlinked games
+  // Only process non-orphaned unlinked games
   const unlinkedResult = await db.execute(
-    "SELECT COUNT(*) as count FROM games WHERE draft_id IS NULL"
+    "SELECT COUNT(*) as count FROM games WHERE draft_id IS NULL AND (orphaned IS NULL OR orphaned = 0)"
   );
   const unlinkedCount = unlinkedResult.rows[0].count as number;
 
@@ -136,7 +136,7 @@ async function linkGamesToDrafts(
 
   // Get unlinked game IDs for matching (extract ID before underscore)
   const gamesResult = await db.execute(
-    "SELECT DISTINCT SUBSTR(id, 1, INSTR(id, '_') - 1) as game_id FROM games WHERE draft_id IS NULL"
+    "SELECT DISTINCT SUBSTR(id, 1, INSTR(id, '_') - 1) as game_id FROM games WHERE draft_id IS NULL AND (orphaned IS NULL OR orphaned = 0)"
   );
   const unlinkedGameIds = new Set(gamesResult.rows.map((r) => r.game_id as string));
 
@@ -154,6 +154,7 @@ async function linkGamesToDrafts(
               args: [draftId, game.game_number, `${gameId}%`],
             });
             if (result.rowsAffected > 0) {
+              console.log(`[turso] Linked game ${gameId} to draft ${draftId}`);
               updated++;
               unlinkedGameIds.delete(gameId);
             }
@@ -170,7 +171,19 @@ async function linkGamesToDrafts(
     }
   }
 
-  console.log(`Linked ${updated} games to drafts`);
+  console.log(`[turso] Linked ${updated} games to drafts`);
+
+  // Mark remaining unlinked games as orphaned
+  if (unlinkedGameIds.size > 0) {
+    const orphanResult = await db.execute(
+      "UPDATE games SET orphaned = 1 WHERE draft_id IS NULL AND (orphaned IS NULL OR orphaned = 0)"
+    );
+    if (orphanResult.rowsAffected > 0) {
+      console.log(
+        `[turso] Marked ${orphanResult.rowsAffected} games as orphaned (no matching draft)`
+      );
+    }
+  }
 }
 
 async function sync() {
@@ -251,6 +264,7 @@ async function sync() {
           new Date().toISOString(),
         ],
       });
+      console.log(`[turso] Inserted draft ${draft.id}`);
 
       // Insert picks and cards
       await insertPicksAndCards(db, draft.id, detail);
@@ -294,7 +308,7 @@ async function sync() {
     // Update last sync date after successful sync
     const today = new Date().toISOString().split("T")[0];
     await setSyncMetadata("last_sync_date", today);
-    console.log(`Updated last_sync_date to ${today}`);
+    console.log(`[turso] Updated last_sync_date to ${today}`);
 
     await api.close();
   } finally {
@@ -307,6 +321,7 @@ async function insertPicksAndCards(
   draftId: string,
   detail: SeventeenLandsDraftDetail
 ) {
+  let picksInserted = 0;
   for (const pick of detail.picks) {
     // Upsert the picked card
     await db.execute({
@@ -333,6 +348,7 @@ async function insertPicksAndCards(
         JSON.stringify(pick.available.map((c) => c.name)),
       ],
     });
+    picksInserted++;
 
     // Upsert available cards
     for (const card of pick.available) {
@@ -349,12 +365,14 @@ async function insertPicksAndCards(
       });
     }
   }
+  console.log(`[turso] Inserted ${picksInserted} picks for draft ${draftId}`);
 }
 
 async function updateCardStats(db: DbClient, set: string, detail: SeventeenLandsDraftDetail) {
   const now = new Date().toISOString();
+  const cardEntries = Object.entries(detail.card_performance_data);
 
-  for (const [cardName, stats] of Object.entries(detail.card_performance_data)) {
+  for (const [cardName, stats] of cardEntries) {
     // Ensure card exists
     await db.execute({
       sql: `INSERT OR IGNORE INTO cards (name) VALUES (?)`,
@@ -377,6 +395,7 @@ async function updateCardStats(db: DbClient, set: string, detail: SeventeenLands
       ],
     });
   }
+  console.log(`[turso] Updated stats for ${cardEntries.length} cards in ${set}`);
 }
 
 function extractColors(manaCost: string): string {

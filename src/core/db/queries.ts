@@ -290,6 +290,7 @@ export async function getDeck(draftId: string): Promise<DeckWithCards | null> {
       oracle_text: row.oracle_text as string | null,
       cmc: row.cmc as number | null,
       rarity: row.rarity as string | null,
+      scryfall_not_found: row.scryfall_not_found as number | null,
       quantity: row.quantity as number,
     };
 

@@ -33,6 +33,7 @@ export interface Card {
   oracle_text: string | null;
   cmc: number | null;
   rarity: string | null;
+  scryfall_not_found: number | null;
 }
 
 export interface CardStats {
@@ -60,6 +61,7 @@ export interface Game {
   won: number;
   turns: number | null;
   event_name: string | null;
+  orphaned: number | null;
 }
 
 export interface Decklist {
@@ -108,7 +110,8 @@ CREATE TABLE IF NOT EXISTS cards (
   oracle_id TEXT,
   oracle_text TEXT,
   cmc REAL,
-  rarity TEXT
+  rarity TEXT,
+  scryfall_not_found INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS card_stats (
@@ -136,7 +139,8 @@ CREATE TABLE IF NOT EXISTS games (
   on_play INTEGER NOT NULL,
   won INTEGER NOT NULL,
   turns INTEGER,
-  event_name TEXT
+  event_name TEXT,
+  orphaned INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_drafts_set ON drafts("set");

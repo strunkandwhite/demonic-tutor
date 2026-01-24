@@ -55,8 +55,10 @@ export async function augmentCards() {
 
   const db = await getClient();
 
-  // Find cards missing oracle_text
-  const result = await db.execute("SELECT name FROM cards WHERE oracle_text IS NULL");
+  // Find cards missing oracle_text (exclude cards already marked as not found)
+  const result = await db.execute(
+    "SELECT name FROM cards WHERE oracle_text IS NULL AND (scryfall_not_found IS NULL OR scryfall_not_found = 0)"
+  );
 
   const cardsToAugment = result.rows.map((r) => r.name as string);
   console.log(`Found ${cardsToAugment.length} cards to augment`);
@@ -96,10 +98,15 @@ export async function augmentCards() {
         ],
       });
       augmented++;
-      process.stdout.write(`\rAugmented ${augmented}/${cardsToAugment.length} cards`);
+      process.stdout.write(`\r[turso] Augmented ${augmented}/${cardsToAugment.length} cards`);
     } else {
+      // Mark card as not found in Scryfall so we don't retry
+      await db.execute({
+        sql: "UPDATE cards SET scryfall_not_found = 1 WHERE name = ?",
+        args: [cardName],
+      });
       notFound++;
-      console.log(`\nCard not found in Scryfall: ${cardName}`);
+      console.log(`\n[turso] Marked card as not found in Scryfall: ${cardName}`);
     }
 
     // Rate limiting

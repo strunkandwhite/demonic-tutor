@@ -99,7 +99,7 @@ export async function syncDecklists(existingClient?: SeventeenLandsClient): Prom
         );
         await insertDecklist(db, draftId, deck);
         synced++;
-        console.log(`  Saved decklist ${synced}/${draftsToSync.length}`);
+        console.log(`  [turso] Saved decklist ${synced}/${draftsToSync.length}`);
       } catch (err) {
         failed++;
         const errMsg = err instanceof Error ? err.message : String(err);
