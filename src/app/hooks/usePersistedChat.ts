@@ -36,6 +36,10 @@ interface UsePersistedChatResult {
 
 const EMPTY_MESSAGES: Message[] = [];
 
+// Cache to ensure getSnapshot returns stable references
+let cachedRawValue: string | null = null;
+let cachedParsedValue: PersistedChat | null = null;
+
 function subscribe() {
   // localStorage doesn't have change events we need to subscribe to
   return () => {};
@@ -44,12 +48,28 @@ function subscribe() {
 function getSnapshot(): PersistedChat | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
+    if (stored === cachedRawValue) {
+      return cachedParsedValue;
+    }
+    cachedRawValue = stored;
+    if (!stored) {
+      cachedParsedValue = null;
+      return null;
+    }
     const parsed: PersistedChat = JSON.parse(stored);
-    if (parsed.version !== CURRENT_VERSION) return null;
-    if (!parsed.userMessage?.id || !parsed.assistantMessage?.id) return null;
+    if (parsed.version !== CURRENT_VERSION) {
+      cachedParsedValue = null;
+      return null;
+    }
+    if (!parsed.userMessage?.id || !parsed.assistantMessage?.id) {
+      cachedParsedValue = null;
+      return null;
+    }
+    cachedParsedValue = parsed;
     return parsed;
   } catch {
+    cachedRawValue = null;
+    cachedParsedValue = null;
     return null;
   }
 }
