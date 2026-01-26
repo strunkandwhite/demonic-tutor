@@ -1,21 +1,7 @@
 import { listDrafts } from "@/core/db/queries";
 import Link from "next/link";
 import { ColorSymbols } from "./ColorSymbols";
-
-function FormatBadge({ format }: { format: string }) {
-  const isPremier = format === "PremierDraft";
-  return (
-    <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
-        isPremier
-          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-          : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-      }`}
-    >
-      {isPremier ? "Bo1" : "Bo3"}
-    </span>
-  );
-}
+import { FormatBadge } from "./FormatBadge";
 
 function RankDisplay({ startRank, endRank }: { startRank: string | null; endRank: string | null }) {
   if (!startRank && !endRank) {
@@ -101,7 +87,7 @@ export async function DraftTable() {
                 {draft.set}
               </td>
               <td className="px-4 py-3">
-                <FormatBadge format={draft.format} />
+                <FormatBadge format={draft.format} size="sm" />
               </td>
               <td className="px-4 py-3">
                 <ColorSymbols colors={draft.colors} />

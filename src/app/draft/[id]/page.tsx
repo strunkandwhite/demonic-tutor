@@ -2,24 +2,10 @@ import { getDraft } from "@/core/db/queries";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ColorSymbols } from "@/app/components/ColorSymbols";
+import { FormatBadge } from "@/app/components/FormatBadge";
 
 interface Props {
   params: Promise<{ id: string }>;
-}
-
-function FormatBadge({ format }: { format: string }) {
-  const isPremier = format === "PremierDraft";
-  return (
-    <span
-      className={`inline-flex items-center rounded px-2 py-1 text-sm font-medium ${
-        isPremier
-          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-          : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-      }`}
-    >
-      {isPremier ? "Bo1" : "Bo3"}
-    </span>
-  );
 }
 
 export default async function DraftPage({ params }: Props) {
