@@ -20,9 +20,17 @@ export default async function Home({ searchParams }: HomeProps) {
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">Demonic Tutor</h1>
-          <p className="mt-1 text-zinc-500 dark:text-zinc-400">Personal MTG draft analytics</p>
+        <header className="mb-8 flex items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/demonic-tutor-art.jpg"
+            alt="Demonic Tutor"
+            className="h-16 w-20 rounded-lg object-cover"
+          />
+          <div>
+            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">Demonic Tutor</h1>
+            <p className="mt-1 text-zinc-500 dark:text-zinc-400">Personal MTG draft analytics</p>
+          </div>
         </header>
 
         {/* Chat */}
@@ -58,6 +66,16 @@ export default async function Home({ searchParams }: HomeProps) {
             className="text-zinc-500 underline hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
           >
             17lands
+          </a>
+          {" · "}
+          Made by{" "}
+          <a
+            href="https://github.com/strunkandwhite"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-zinc-500 underline hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
+          >
+            Jack
           </a>
         </footer>
       </div>
