@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, startTransition } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CardLink } from "./CardLink";
 import { ToolCallIndicator } from "./ToolCallIndicator";
 import { useChatStream } from "@/app/hooks/useChatStream";
+import { usePersistedChat } from "@/app/hooks/usePersistedChat";
 import type { UserContext } from "@/core/llm/tools";
 import type { ModelId } from "@/core/llm";
 
@@ -37,12 +38,33 @@ function generateMessageId(): string {
 }
 
 export function Chat() {
+  const {
+    initialMessages,
+    initialResponseId,
+    initialUserContext,
+    saveLastExchange,
+    clearPersistedChat,
+  } = usePersistedChat();
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState<ModelId>("gpt-5.2-2025-12-11");
   const [responseId, setResponseId] = useState<string | null>(null);
   const [userContext, setUserContext] = useState<UserContext | undefined>();
+  const hasHydrated = useRef(false);
+
+  // Hydrate state from localStorage once on mount
+  useEffect(() => {
+    if (!hasHydrated.current && initialMessages.length > 0) {
+      hasHydrated.current = true;
+      startTransition(() => {
+        setMessages(initialMessages);
+        setResponseId(initialResponseId);
+        setUserContext(initialUserContext);
+      });
+    }
+  }, [initialMessages, initialResponseId, initialUserContext]);
 
   const {
     sendMessage: streamMessage,
@@ -103,8 +125,9 @@ export function Chat() {
         content: result.text,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      saveLastExchange(userMessage, assistantMessage, result.responseId, result.userContext);
     });
-  }, [input, isStreaming, streamMessage]);
+  }, [input, isStreaming, streamMessage, saveLastExchange]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -131,7 +154,8 @@ export function Chat() {
     setMessages([]);
     setError(null);
     setResponseId(null);
-  }, []);
+    clearPersistedChat();
+  }, [clearPersistedChat]);
 
   return (
     <div className="flex h-[600px] flex-col rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
