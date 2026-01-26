@@ -169,7 +169,9 @@ CREATE TABLE IF NOT EXISTS games (
 
 CREATE INDEX IF NOT EXISTS idx_drafts_set ON drafts("set");
 CREATE INDEX IF NOT EXISTS idx_drafts_date ON drafts(draft_date);
+CREATE INDEX IF NOT EXISTS idx_drafts_colors ON drafts(colors);
 CREATE INDEX IF NOT EXISTS idx_picks_draft ON picks(draft_id);
+CREATE INDEX IF NOT EXISTS idx_picks_card_name ON picks(card_name);
 CREATE INDEX IF NOT EXISTS idx_card_stats_set ON card_stats("set");
 CREATE INDEX IF NOT EXISTS idx_games_draft ON games(draft_id);
 

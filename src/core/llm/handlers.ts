@@ -18,6 +18,7 @@ import {
   getTrophyDecklists,
 } from "../db/queries";
 import type { ToolName, UserContext } from "./tools";
+import type { ToolResultCache } from "./cache";
 
 export interface ToolCallResult {
   output: string;
@@ -25,6 +26,29 @@ export interface ToolCallResult {
 }
 
 export async function executeToolCall(
+  name: ToolName,
+  args: Record<string, unknown>,
+  cache?: ToolResultCache
+): Promise<ToolCallResult> {
+  // Check cache for non-mutating tools (everything except set_user_context)
+  if (cache && name !== "set_user_context") {
+    const cached = cache.get(name, args);
+    if (cached) {
+      return { output: cached };
+    }
+  }
+
+  const result = await executeToolCallImpl(name, args);
+
+  // Cache the result
+  if (cache && name !== "set_user_context") {
+    cache.set(name, args, result.output);
+  }
+
+  return result;
+}
+
+async function executeToolCallImpl(
   name: ToolName,
   args: Record<string, unknown>
 ): Promise<ToolCallResult> {

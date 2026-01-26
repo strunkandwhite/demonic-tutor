@@ -28,7 +28,8 @@ export async function DraftTable({ set }: DraftTableProps) {
   let drafts;
   try {
     drafts = await listDrafts({ set, limit: 20 });
-  } catch {
+  } catch (error) {
+    console.error("Failed to load drafts:", error);
     return (
       <div className="rounded-lg border border-zinc-200 bg-white p-6 text-center text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
         Unable to load drafts

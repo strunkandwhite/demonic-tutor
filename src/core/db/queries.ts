@@ -3,15 +3,15 @@
  */
 
 import { getClient } from "./client";
-import type {
-  Draft,
-  Pick,
-  CardStats,
-  Card,
-  Decklist,
-  FormatColorStats,
-  FormatPlayDraw,
-} from "./schema";
+import type { Draft, Pick, CardStats, Card, FormatColorStats, FormatPlayDraw } from "./schema";
+import {
+  mapDraft,
+  mapPick,
+  mapCardStats,
+  mapDecklist,
+  mapFormatColorStats,
+  mapFormatPlayDraw,
+} from "./validators";
 import { deriveArchetypeTags } from "../llm/archetype-tags";
 
 export interface ListDraftsParams {
@@ -58,7 +58,7 @@ export async function listDrafts(params: ListDraftsParams): Promise<Draft[]> {
     args,
   });
 
-  return result.rows as unknown as Draft[];
+  return result.rows.map(mapDraft);
 }
 
 export async function getDraft(draftId: string): Promise<{
@@ -78,8 +78,8 @@ export async function getDraft(draftId: string): Promise<{
   });
 
   return {
-    draft: (draftResult.rows[0] as unknown as Draft) || null,
-    picks: picksResult.rows as unknown as Pick[],
+    draft: draftResult.rows[0] ? mapDraft(draftResult.rows[0]) : null,
+    picks: picksResult.rows.map(mapPick),
   };
 }
 
@@ -131,7 +131,9 @@ export async function getMyStats(params: MyStatsParams): Promise<MyStats> {
             SUM(CASE WHEN wins = 7 THEN 1 ELSE 0 END) as trophies,
             colors
           FROM drafts ${where}
-          GROUP BY colors`,
+          GROUP BY colors
+          ORDER BY total_drafts DESC
+          LIMIT 50`,
     args,
   });
 
@@ -142,24 +144,19 @@ export async function getMyStats(params: MyStatsParams): Promise<MyStats> {
   const colorBreakdown: Record<string, { drafts: number; wins: number; losses: number }> = {};
 
   for (const row of result.rows) {
-    const r = row as unknown as {
-      total_drafts: number;
-      total_wins: number;
-      total_losses: number;
-      trophies: number;
-      colors: string;
-    };
-    totalDrafts += r.total_drafts;
-    totalWins += r.total_wins;
-    totalLosses += r.total_losses;
-    trophies += r.trophies;
+    const drafts = row.total_drafts as number;
+    const wins = row.total_wins as number;
+    const losses = row.total_losses as number;
+    const rowTrophies = row.trophies as number;
+    const colors = row.colors as string | null;
 
-    if (r.colors) {
-      colorBreakdown[r.colors] = {
-        drafts: r.total_drafts,
-        wins: r.total_wins,
-        losses: r.total_losses,
-      };
+    totalDrafts += drafts;
+    totalWins += wins;
+    totalLosses += losses;
+    trophies += rowTrophies;
+
+    if (colors) {
+      colorBreakdown[colors] = { drafts, wins, losses };
     }
   }
 
@@ -179,7 +176,7 @@ export async function getCardStats(cardName: string, set: string): Promise<CardS
     sql: 'SELECT * FROM card_stats WHERE card_name = ? AND "set" = ?',
     args: [cardName, set],
   });
-  return (result.rows[0] as unknown as CardStats) || null;
+  return result.rows[0] ? mapCardStats(result.rows[0]) : null;
 }
 
 export async function getFormatTopCards(set: string, limit: number = 20): Promise<CardStats[]> {
@@ -191,7 +188,7 @@ export async function getFormatTopCards(set: string, limit: number = 20): Promis
           LIMIT ?`,
     args: [set, limit],
   });
-  return result.rows as unknown as CardStats[];
+  return result.rows.map(mapCardStats);
 }
 
 export async function getMyCardHistory(
@@ -279,7 +276,7 @@ export async function getDeck(draftId: string): Promise<DeckWithCards | null> {
     return null;
   }
 
-  const decklist = deckResult.rows[0] as unknown as Decklist;
+  const decklist = mapDecklist(deckResult.rows[0]);
 
   // Get cards with full details
   const cardsResult = await db.execute({
@@ -521,7 +518,7 @@ export async function getFormatColorStats(
     args,
   });
 
-  return result.rows as unknown as FormatColorStats[];
+  return result.rows.map(mapFormatColorStats);
 }
 
 export async function getFormatPlayDraw(
@@ -544,7 +541,7 @@ export async function getFormatPlayDraw(
     args,
   });
 
-  return (result.rows[0] as unknown as FormatPlayDraw) || null;
+  return result.rows[0] ? mapFormatPlayDraw(result.rows[0]) : null;
 }
 
 export interface TrophyDecklist {

@@ -4,6 +4,7 @@
 
 import { config } from "dotenv";
 config({ path: ".env.local", quiet: true });
+import type { InValue } from "@libsql/client";
 import { getClient, closeClient } from "../core/db/client";
 
 const SCRYFALL_API = "https://api.scryfall.com";
@@ -23,30 +24,47 @@ interface ScryfallCard {
   colors?: string[];
 }
 
-async function fetchCard(name: string, retries = 3): Promise<ScryfallCard | null> {
-  const url = `${SCRYFALL_API}/cards/named?exact=${encodeURIComponent(name)}`;
+const FETCH_TIMEOUT_MS = 30000; // 30 second timeout
+const BATCH_SIZE = 75; // Scryfall collection endpoint limit
+
+interface ScryfallCollectionResponse {
+  data: ScryfallCard[];
+  not_found: Array<{ name: string }>;
+}
+
+async function fetchCardsBatch(
+  names: string[],
+  retries = 3
+): Promise<{ found: ScryfallCard[]; notFound: string[] }> {
+  const url = `${SCRYFALL_API}/cards/collection`;
+  const identifiers = names.map((name) => ({ name }));
 
   try {
-    const response = await fetch(url);
-
-    if (response.status === 404) {
-      return null;
-    }
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifiers }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
 
     if (response.status === 429 && retries > 0) {
       console.log(`\nRate limited by Scryfall, waiting 5 seconds...`);
       await new Promise((r) => setTimeout(r, 5000));
-      return fetchCard(name, retries - 1);
+      return fetchCardsBatch(names, retries - 1);
     }
 
     if (!response.ok) {
       throw new Error(`Scryfall API error: ${response.status}`);
     }
 
-    return response.json();
+    const data: ScryfallCollectionResponse = await response.json();
+    return {
+      found: data.data,
+      notFound: data.not_found.map((c) => c.name),
+    };
   } catch (error) {
-    console.error(`Failed to fetch ${name}:`, error);
-    return null;
+    console.error(`Failed to fetch batch of ${names.length} cards:`, error);
+    return { found: [], notFound: names };
   }
 }
 
@@ -68,13 +86,19 @@ export async function augmentCards() {
   }
 
   let augmented = 0;
-  let notFound = 0;
+  let notFoundCount = 0;
 
-  for (const cardName of cardsToAugment) {
-    const card = await fetchCard(cardName);
+  // Process in batches of 75 (Scryfall limit)
+  for (let i = 0; i < cardsToAugment.length; i += BATCH_SIZE) {
+    const batch = cardsToAugment.slice(i, i + BATCH_SIZE);
+    const { found, notFound } = await fetchCardsBatch(batch);
 
-    if (card) {
-      await db.execute({
+    // Build batch update statements
+    const statements: Array<{ sql: string; args: InValue[] }> = [];
+
+    // Update found cards
+    for (const card of found) {
+      statements.push({
         sql: `UPDATE cards SET
                 oracle_id = ?,
                 oracle_text = ?,
@@ -94,26 +118,36 @@ export async function augmentCards() {
           card.type_line,
           card.mana_cost || "",
           card.colors?.join("") || "",
-          cardName,
+          card.name,
         ],
       });
-      augmented++;
-      process.stdout.write(`\r[turso] Augmented ${augmented}/${cardsToAugment.length} cards`);
-    } else {
-      // Mark card as not found in Scryfall so we don't retry
-      await db.execute({
-        sql: "UPDATE cards SET scryfall_not_found = 1 WHERE name = ?",
-        args: [cardName],
-      });
-      notFound++;
-      console.log(`\n[turso] Marked card as not found in Scryfall: ${cardName}`);
     }
 
-    // Rate limiting
-    await new Promise((r) => setTimeout(r, RATE_LIMIT_MS));
+    // Mark not found cards
+    for (const name of notFound) {
+      statements.push({
+        sql: "UPDATE cards SET scryfall_not_found = 1 WHERE name = ?",
+        args: [name],
+      });
+    }
+
+    if (statements.length > 0) {
+      await db.batch(statements);
+    }
+
+    augmented += found.length;
+    notFoundCount += notFound.length;
+    console.log(
+      `[turso] Processed batch ${Math.floor(i / BATCH_SIZE) + 1}: ${found.length} found, ${notFound.length} not found`
+    );
+
+    // Rate limiting between batches
+    if (i + BATCH_SIZE < cardsToAugment.length) {
+      await new Promise((r) => setTimeout(r, RATE_LIMIT_MS));
+    }
   }
 
-  console.log(`\nAugmentation complete: ${augmented} updated, ${notFound} not found`);
+  console.log(`Augmentation complete: ${augmented} updated, ${notFoundCount} not found`);
   // Note: Don't close DB client here - caller manages lifecycle
 }
 

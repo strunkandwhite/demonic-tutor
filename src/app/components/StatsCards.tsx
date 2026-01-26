@@ -8,7 +8,8 @@ export async function StatsCards({ set }: StatsCardsProps) {
   let stats;
   try {
     stats = await getMyStats({ set });
-  } catch {
+  } catch (error) {
+    console.error("Failed to load stats:", error);
     return <div className="text-sm text-zinc-400 dark:text-zinc-500">Unable to load stats</div>;
   }
 

@@ -19,6 +19,7 @@ import type {
 const BASE_URL = "https://www.17lands.com";
 const SESSION_FILE = ".seventeen-lands-session.json";
 const MIN_API_DELAY_MS = 1000; // Minimum delay between API calls
+const API_TIMEOUT_MS = 30000; // 30 second timeout for API calls
 
 function log(message: string): void {
   const timestamp = new Date().toISOString().split("T")[1].slice(0, 12);
@@ -31,6 +32,13 @@ async function sleep(ms: number, reason?: string): Promise<void> {
     log(`Waiting ${ms}ms (${reason})`);
   }
   await new Promise((r) => setTimeout(r, ms));
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`${operation} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]);
 }
 
 async function withRetry<T>(
@@ -152,7 +160,7 @@ export class SeventeenLandsClient {
     if (!this.context) return;
     log("Saving session to disk...");
     const sessionData = await this.context.storageState();
-    writeFileSync(SESSION_FILE, JSON.stringify(sessionData, null, 2));
+    writeFileSync(SESSION_FILE, JSON.stringify(sessionData, null, 2), { mode: 0o600 });
     log("Session saved");
   }
 
@@ -177,23 +185,27 @@ export class SeventeenLandsClient {
     const startTime = Date.now();
 
     try {
-      const result = await page.evaluate(async (url: string) => {
-        const response = await fetch(url, {
-          credentials: "include",
-          headers: {
-            accept: "application/json, text/plain, */*",
-          },
-        });
+      const result = await withTimeout(
+        page.evaluate(async (url: string) => {
+          const response = await fetch(url, {
+            credentials: "include",
+            headers: {
+              accept: "application/json, text/plain, */*",
+            },
+          });
 
-        // Return both status and data for logging
-        const data = response.ok ? await response.json() : null;
-        return {
-          status: response.status,
-          statusText: response.statusText,
-          ok: response.ok,
-          data,
-        };
-      }, fullUrl);
+          // Return both status and data for logging
+          const data = response.ok ? await response.json() : null;
+          return {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            data,
+          };
+        }, fullUrl),
+        API_TIMEOUT_MS,
+        `GET ${path}`
+      );
 
       const elapsed = Date.now() - startTime;
       log(`API RESPONSE: ${result.status} ${result.statusText} (${elapsed}ms)`);
@@ -245,28 +257,32 @@ export class SeventeenLandsClient {
     const startTime = Date.now();
 
     try {
-      const result = await page.evaluate(
-        async ({ url, bodyData }: { url: string; bodyData: unknown }) => {
-          const response = await fetch(url, {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              accept: "application/json, text/plain, */*",
-              "content-type": "application/json",
-            },
-            body: JSON.stringify(bodyData),
-          });
+      const result = await withTimeout(
+        page.evaluate(
+          async ({ url, bodyData }: { url: string; bodyData: unknown }) => {
+            const response = await fetch(url, {
+              method: "POST",
+              credentials: "include",
+              headers: {
+                accept: "application/json, text/plain, */*",
+                "content-type": "application/json",
+              },
+              body: JSON.stringify(bodyData),
+            });
 
-          // Return both status and data for logging
-          const data = response.ok ? await response.json() : null;
-          return {
-            status: response.status,
-            statusText: response.statusText,
-            ok: response.ok,
-            data,
-          };
-        },
-        { url: fullUrl, bodyData: body }
+            // Return both status and data for logging
+            const data = response.ok ? await response.json() : null;
+            return {
+              status: response.status,
+              statusText: response.statusText,
+              ok: response.ok,
+              data,
+            };
+          },
+          { url: fullUrl, bodyData: body }
+        ),
+        API_TIMEOUT_MS,
+        `POST ${path}`
       );
 
       const elapsed = Date.now() - startTime;

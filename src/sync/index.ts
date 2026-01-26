@@ -4,6 +4,7 @@
 
 import { config } from "dotenv";
 config({ path: ".env.local", quiet: true });
+import type { InValue } from "@libsql/client";
 import { getClient, closeClient } from "../core/db/client";
 import { createSeventeenLandsClient } from "../core/seventeen-lands";
 import type { SeventeenLandsDraftDetail } from "../core/seventeen-lands";
@@ -48,8 +49,8 @@ async function syncGames(
 ) {
   console.log("Syncing games...");
 
-  const gameData = await api.getGames();
-  const games = gameData.games;
+  const gamesList = await api.getGames();
+  const games = gamesList.games;
 
   // Get existing game IDs
   const existingGames = new Set<string>();
@@ -84,32 +85,54 @@ async function syncGames(
     return;
   }
 
-  let inserted = 0;
-  for (const game of newGames) {
-    const parsed = parseGameLink(game.link);
-    if (!parsed) continue;
+  // Prepare game data for batch insert
+  const gameData = newGames
+    .map((game) => {
+      const parsed = parseGameLink(game.link);
+      if (!parsed) return null;
+      return {
+        id: `${parsed.draftId}_${parsed.gameNumber}`,
+        draftId: existingDraftIds.has(parsed.draftId) ? parsed.draftId : null,
+        gameNumber: parsed.gameNumber,
+        gameTime: game.game_time,
+        onPlay: game.on_play ? 1 : 0,
+        won: game.won ? 1 : 0,
+        turns: game.turns,
+        eventName: game.event_name,
+      };
+    })
+    .filter((g): g is NonNullable<typeof g> => g !== null);
 
-    const id = `${parsed.draftId}_${parsed.gameNumber}`;
-    const draftId = existingDraftIds.has(parsed.draftId) ? parsed.draftId : null;
-
-    await db.execute({
-      sql: `INSERT OR IGNORE INTO games (id, draft_id, game_number, game_time, on_play, won, turns, event_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        id,
-        draftId,
-        parsed.gameNumber,
-        game.game_time,
-        game.on_play ? 1 : 0,
-        game.won ? 1 : 0,
-        game.turns,
-        game.event_name,
-      ],
-    });
-    inserted++;
+  if (gameData.length === 0) {
+    console.log("[turso] No games to insert");
+    return;
   }
 
-  console.log(`[turso] Inserted ${inserted} games`);
+  // Batch insert games (50 at a time)
+  const statements: Array<{ sql: string; args: InValue[] }> = [];
+  const BATCH_SIZE = 50;
+
+  for (let i = 0; i < gameData.length; i += BATCH_SIZE) {
+    const batch = gameData.slice(i, i + BATCH_SIZE);
+    const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+    const args = batch.flatMap((g) => [
+      g.id,
+      g.draftId,
+      g.gameNumber,
+      g.gameTime,
+      g.onPlay,
+      g.won,
+      g.turns,
+      g.eventName,
+    ]);
+    statements.push({
+      sql: `INSERT OR IGNORE INTO games (id, draft_id, game_number, game_time, on_play, won, turns, event_name) VALUES ${placeholders}`,
+      args,
+    });
+  }
+
+  await db.batch(statements);
+  console.log(`[turso] Inserted ${gameData.length} games`);
 }
 
 export function parseGameIdFromS3Path(s3Path: string): string | null {
@@ -325,80 +348,136 @@ async function insertPicksAndCards(
   draftId: string,
   detail: SeventeenLandsDraftDetail
 ) {
-  let picksInserted = 0;
+  // Collect all cards (picked + available) for batch insert
+  const cardMap = new Map<
+    string,
+    { imageUrl: string | null; types: string; manaCost: string; colors: string }
+  >();
+
+  // Collect pick data
+  const pickData: Array<{
+    packNumber: number;
+    pickNumber: number;
+    cardName: string;
+    availableCards: string;
+  }> = [];
+
   for (const pick of detail.picks) {
-    // Upsert the picked card
-    await db.execute({
-      sql: `INSERT OR REPLACE INTO cards (name, image_url, types, mana_cost, colors)
-            VALUES (?, ?, ?, ?, ?)`,
-      args: [
-        pick.pick.name,
-        pick.pick.image_url,
-        pick.pick.types.join(" "),
-        pick.pick.mana_cost,
-        extractColors(pick.pick.mana_cost),
-      ],
+    // Add picked card
+    cardMap.set(pick.pick.name, {
+      imageUrl: pick.pick.image_url,
+      types: pick.pick.types.join(" "),
+      manaCost: pick.pick.mana_cost,
+      colors: extractColors(pick.pick.mana_cost),
     });
 
-    // Insert pick
-    await db.execute({
-      sql: `INSERT INTO picks (draft_id, pack_number, pick_number, card_name, available_cards)
-            VALUES (?, ?, ?, ?, ?)`,
-      args: [
-        draftId,
-        pick.pack_number,
-        pick.pick_number,
-        pick.pick.name,
-        JSON.stringify(pick.available.map((c) => c.name)),
-      ],
-    });
-    picksInserted++;
-
-    // Upsert available cards
+    // Add available cards
     for (const card of pick.available) {
-      await db.execute({
-        sql: `INSERT OR IGNORE INTO cards (name, image_url, types, mana_cost, colors)
-              VALUES (?, ?, ?, ?, ?)`,
-        args: [
-          card.name,
-          card.image_url,
-          card.types.join(" "),
-          card.mana_cost,
-          extractColors(card.mana_cost),
-        ],
-      });
+      if (!cardMap.has(card.name)) {
+        cardMap.set(card.name, {
+          imageUrl: card.image_url,
+          types: card.types.join(" "),
+          manaCost: card.mana_cost,
+          colors: extractColors(card.mana_cost),
+        });
+      }
     }
+
+    // Collect pick
+    pickData.push({
+      packNumber: pick.pack_number,
+      pickNumber: pick.pick_number,
+      cardName: pick.pick.name,
+      availableCards: JSON.stringify(pick.available.map((c) => c.name)),
+    });
   }
-  console.log(`[turso] Inserted ${picksInserted} picks for draft ${draftId}`);
+
+  // Build batch statements
+  const statements: Array<{ sql: string; args: InValue[] }> = [];
+
+  // Batch insert cards (50 at a time to stay under query limits)
+  const cards = Array.from(cardMap.entries());
+  const CARD_BATCH_SIZE = 50;
+  for (let i = 0; i < cards.length; i += CARD_BATCH_SIZE) {
+    const batch = cards.slice(i, i + CARD_BATCH_SIZE);
+    const placeholders = batch.map(() => "(?, ?, ?, ?, ?)").join(", ");
+    const args = batch.flatMap(([name, data]) => [
+      name,
+      data.imageUrl,
+      data.types,
+      data.manaCost,
+      data.colors,
+    ]);
+    statements.push({
+      sql: `INSERT OR IGNORE INTO cards (name, image_url, types, mana_cost, colors) VALUES ${placeholders}`,
+      args,
+    });
+  }
+
+  // Batch insert picks (all at once since typically ~45 picks)
+  if (pickData.length > 0) {
+    const placeholders = pickData.map(() => "(?, ?, ?, ?, ?)").join(", ");
+    const args = pickData.flatMap((p) => [
+      draftId,
+      p.packNumber,
+      p.pickNumber,
+      p.cardName,
+      p.availableCards,
+    ]);
+    statements.push({
+      sql: `INSERT INTO picks (draft_id, pack_number, pick_number, card_name, available_cards) VALUES ${placeholders}`,
+      args,
+    });
+  }
+
+  // Execute all statements in a batch (transaction)
+  await db.batch(statements);
+  console.log(
+    `[turso] Inserted ${pickData.length} picks and ${cards.length} cards for draft ${draftId}`
+  );
 }
 
 async function updateCardStats(db: DbClient, set: string, detail: SeventeenLandsDraftDetail) {
   const now = new Date().toISOString();
   const cardEntries = Object.entries(detail.card_performance_data);
 
-  for (const [cardName, stats] of cardEntries) {
-    // Ensure card exists
-    await db.execute({
-      sql: `INSERT OR IGNORE INTO cards (name) VALUES (?)`,
-      args: [cardName],
-    });
+  if (cardEntries.length === 0) return;
 
-    await db.execute({
-      sql: `INSERT OR REPLACE INTO card_stats
-            (card_name, "set", avg_seen_at, avg_pick_at, game_in_hand_wr, times_seen, times_picked, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        cardName,
-        set,
-        stats.avg_seen_position,
-        stats.avg_pick_position,
-        stats.game_in_hand_win_rate,
-        stats.total_times_seen,
-        stats.total_times_picked,
-        now,
-      ],
+  const statements: Array<{ sql: string; args: InValue[] }> = [];
+  const BATCH_SIZE = 50;
+
+  // Batch insert card names to ensure they exist
+  for (let i = 0; i < cardEntries.length; i += BATCH_SIZE) {
+    const batch = cardEntries.slice(i, i + BATCH_SIZE);
+    const placeholders = batch.map(() => "(?)").join(", ");
+    const args = batch.map(([cardName]) => cardName);
+    statements.push({
+      sql: `INSERT OR IGNORE INTO cards (name) VALUES ${placeholders}`,
+      args,
     });
   }
+
+  // Batch insert card stats
+  for (let i = 0; i < cardEntries.length; i += BATCH_SIZE) {
+    const batch = cardEntries.slice(i, i + BATCH_SIZE);
+    const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+    const args = batch.flatMap(([cardName, stats]) => [
+      cardName,
+      set,
+      stats.avg_seen_position,
+      stats.avg_pick_position,
+      stats.game_in_hand_win_rate,
+      stats.total_times_seen,
+      stats.total_times_picked,
+      now,
+    ]);
+    statements.push({
+      sql: `INSERT OR REPLACE INTO card_stats (card_name, "set", avg_seen_at, avg_pick_at, game_in_hand_wr, times_seen, times_picked, updated_at) VALUES ${placeholders}`,
+      args,
+    });
+  }
+
+  await db.batch(statements);
   console.log(`[turso] Updated stats for ${cardEntries.length} cards in ${set}`);
 }
 

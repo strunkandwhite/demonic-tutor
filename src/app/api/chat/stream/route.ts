@@ -1,6 +1,7 @@
-import { NextRequest } from "next/server";
-import { chatStream, AVAILABLE_MODELS, type ModelId } from "@/core/llm";
-import type { UserContext } from "@/core/llm/tools";
+import { NextRequest, NextResponse } from "next/server";
+import { chatStream, AVAILABLE_MODELS, type ModelId, type UserContext } from "@/core/llm";
+import { validateAuth } from "../../auth";
+import { checkRateLimit, rateLimitResponse } from "../../rate-limit";
 
 interface ChatStreamRequest {
   message: string;
@@ -10,13 +11,20 @@ interface ChatStreamRequest {
 }
 
 export async function POST(request: NextRequest) {
+  // Validate authentication
+  const authError = validateAuth(request);
+  if (authError) return authError;
+
+  // Check rate limit
+  const rateLimit = checkRateLimit(request);
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(rateLimit.resetMs);
+  }
+
   const body = (await request.json()) as ChatStreamRequest;
 
   if (!body.message || typeof body.message !== "string") {
-    return new Response(JSON.stringify({ error: "message is required" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
 
   const model: ModelId =
@@ -37,9 +45,10 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode(data));
         }
       } catch (err) {
+        console.error("Chat stream error:", err);
         const errorEvent = {
           type: "error",
-          message: err instanceof Error ? err.message : "Unknown error",
+          message: "An unexpected error occurred",
         };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
       } finally {

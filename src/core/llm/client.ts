@@ -5,6 +5,7 @@
 import OpenAI from "openai";
 import { tools, isValidToolName, type UserContext } from "./tools";
 import { executeToolCall } from "./handlers";
+import { ToolResultCache } from "./cache";
 import type { StreamEvent } from "./stream-types";
 
 const SYSTEM_PROMPT = `You are an expert limited Magic: The Gathering draft coach with deep knowledge of archetypes and formats. CRITICAL: Always wrap every Magic card name in double brackets like [[Lightning Bolt]] for hover previews—NO EXCEPTIONS, and double-bracket names even if they appear more than once in the same sentence or paragraph, regardless of output context. Your coaching is Socratic—always begin with clarifying questions to understand the player's reasoning and context before any critique. Engage in two-way dialogue, not monologue, and adjust based on user information.
@@ -128,9 +129,10 @@ export async function chat(
     reasoning: { effort: "medium" },
   });
 
-  // Handle tool calls
+  // Handle tool calls with request-scoped cache
   let currentResponse = response;
   let newUserContext: UserContext | undefined = userContext;
+  const cache = new ToolResultCache();
 
   while (currentResponse.output.some((o) => o.type === "function_call")) {
     const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
@@ -148,7 +150,7 @@ export async function chat(
         }
 
         const args = JSON.parse(output.arguments);
-        const result = await executeToolCall(name, args);
+        const result = await executeToolCall(name, args, cache);
         toolResults.push({
           type: "function_call_output",
           call_id: output.call_id,
@@ -225,6 +227,7 @@ export async function* chatStream(
   }
 
   let newUserContext: UserContext | undefined = userContext;
+  const cache = new ToolResultCache();
 
   while (currentResponse.output.some((o) => o.type === "function_call")) {
     const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
@@ -252,7 +255,7 @@ export async function* chatStream(
           arguments: args,
         };
 
-        const result = await executeToolCall(name, args);
+        const result = await executeToolCall(name, args, cache);
 
         // Yield tool call complete event
         yield {

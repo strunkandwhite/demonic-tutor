@@ -4,6 +4,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { chat, AVAILABLE_MODELS, type ModelId, type UserContext } from "@/core/llm";
+import { validateAuth } from "../auth";
+import { checkRateLimit, rateLimitResponse } from "../rate-limit";
 
 interface ChatRequest {
   message: string;
@@ -26,6 +28,16 @@ interface ErrorResponse {
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<ChatResponse | ErrorResponse>> {
+  // Validate authentication
+  const authError = validateAuth(request);
+  if (authError) return authError;
+
+  // Check rate limit
+  const rateLimit = checkRateLimit(request);
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(rateLimit.resetMs);
+  }
+
   try {
     const body = (await request.json()) as ChatRequest;
 
@@ -47,13 +59,6 @@ export async function POST(
     });
   } catch (error) {
     console.error("Chat API error:", error);
-
-    if (error instanceof Error) {
-      if (error.message.includes("OPENAI_API_KEY")) {
-        return NextResponse.json({ error: "OpenAI API key not configured" }, { status: 500 });
-      }
-    }
-
     return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 });
   }
 }
