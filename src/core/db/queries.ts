@@ -235,6 +235,12 @@ export async function getMyCardHistory(
   };
 }
 
+export async function getDistinctSets(): Promise<string[]> {
+  const db = await getClient();
+  const result = await db.execute('SELECT DISTINCT "set" FROM drafts ORDER BY "set"');
+  return result.rows.map((row) => row.set as string);
+}
+
 export async function getSyncMetadata(key: string): Promise<string | null> {
   const db = await getClient();
   const result = await db.execute({

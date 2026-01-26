@@ -1,13 +1,21 @@
 import { Chat } from "./components/Chat";
 import { StatsCards } from "./components/StatsCards";
 import { DraftTable } from "./components/DraftTable";
+import { SetFilter } from "./components/SetFilter";
+import { getDistinctSets } from "@/core/db/queries";
 import { Suspense } from "react";
 
 function LoadingSkeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800 ${className}`} />;
 }
 
-export default function Home() {
+interface HomeProps {
+  searchParams: Promise<{ set?: string }>;
+}
+
+export default async function Home({ searchParams }: HomeProps) {
+  const { set } = await searchParams;
+  const sets = await getDistinctSets();
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -22,20 +30,21 @@ export default function Home() {
           <Chat />
         </section>
 
-        {/* Stats */}
-        <section className="mb-8">
-          <Suspense fallback={<LoadingSkeleton className="h-24" />}>
-            <StatsCards />
-          </Suspense>
-        </section>
-
         {/* Recent Drafts */}
         <section>
-          <h2 className="mb-4 text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-            Recent Drafts
-          </h2>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+              Recent Drafts
+            </h2>
+            <SetFilter sets={sets} currentSet={set} />
+          </div>
+          <div className="mb-4">
+            <Suspense fallback={<LoadingSkeleton className="h-5 w-64" />}>
+              <StatsCards set={set} />
+            </Suspense>
+          </div>
           <Suspense fallback={<LoadingSkeleton className="h-64" />}>
-            <DraftTable />
+            <DraftTable set={set} />
           </Suspense>
         </section>
 

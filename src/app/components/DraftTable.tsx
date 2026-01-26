@@ -20,10 +20,14 @@ function RankDisplay({ startRank, endRank }: { startRank: string | null; endRank
   );
 }
 
-export async function DraftTable() {
+interface DraftTableProps {
+  set?: string;
+}
+
+export async function DraftTable({ set }: DraftTableProps) {
   let drafts;
   try {
-    drafts = await listDrafts({ limit: 20 });
+    drafts = await listDrafts({ set, limit: 20 });
   } catch {
     return (
       <div className="rounded-lg border border-zinc-200 bg-white p-6 text-center text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
@@ -36,9 +40,15 @@ export async function DraftTable() {
     return (
       <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center dark:border-zinc-700 dark:bg-zinc-900">
         <p className="text-zinc-500 dark:text-zinc-400">
-          No drafts yet. Run{" "}
-          <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">pnpm sync</code> to import
-          from 17lands.
+          {set ? (
+            `No drafts found for ${set}.`
+          ) : (
+            <>
+              No drafts yet. Run{" "}
+              <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">pnpm sync</code> to import
+              from 17lands.
+            </>
+          )}
         </p>
       </div>
     );
