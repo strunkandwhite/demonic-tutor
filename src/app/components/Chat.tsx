@@ -4,6 +4,10 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CardLink } from "./CardLink";
+import { ToolCallIndicator } from "./ToolCallIndicator";
+import { useChatStream } from "@/app/hooks/useChatStream";
+import type { UserContext } from "@/core/llm/tools";
+import type { ModelId } from "@/core/llm";
 
 /**
  * Replace [[Card Name]] with markdown links using card: protocol.
@@ -15,8 +19,6 @@ function processCardLinks(text: string): string {
     (_, cardName) => `[${cardName}](card:${encodeURIComponent(cardName)})`
   );
 }
-
-type ModelId = "gpt-4o-mini" | "gpt-5.2-2025-12-11";
 
 const MODELS: { id: ModelId; label: string }[] = [
   { id: "gpt-5.2-2025-12-11", label: "GPT-5.2" },
@@ -37,10 +39,18 @@ function generateMessageId(): string {
 export function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState<ModelId>("gpt-5.2-2025-12-11");
   const [responseId, setResponseId] = useState<string | null>(null);
+  const [userContext, setUserContext] = useState<UserContext | undefined>();
+
+  const {
+    sendMessage: streamMessage,
+    activeToolCalls,
+    completedToolCalls,
+    isStreaming,
+    error: streamError,
+  } = useChatStream(model, responseId, userContext);
 
   // Refs for auto-scrolling and textarea auto-resize
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -69,9 +79,9 @@ export function Chat() {
     }
   }, [input]);
 
-  const sendMessage = useCallback(async () => {
+  const sendMessage = useCallback(() => {
     const trimmedInput = input.trim();
-    if (!trimmedInput || loading) return;
+    if (!trimmedInput || isStreaming) return;
 
     const userMessage: Message = {
       id: generateMessageId(),
@@ -81,40 +91,20 @@ export function Chat() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setError(null);
-    setLoading(true);
 
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: trimmedInput,
-          model,
-          ...(responseId && { previousResponseId: responseId }),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Request failed");
+    streamMessage(trimmedInput, (result) => {
+      setResponseId(result.responseId);
+      if (result.userContext) {
+        setUserContext(result.userContext);
       }
-
-      setResponseId(data.responseId);
-
       const assistantMessage: Message = {
         id: generateMessageId(),
         role: "assistant",
-        content: data.text,
+        content: result.text,
       };
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [input, loading, model, responseId]);
+    });
+  }, [input, isStreaming, streamMessage]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -126,7 +116,6 @@ export function Chat() {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Submit on Enter (without Shift for multiline support)
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
@@ -134,6 +123,9 @@ export function Chat() {
     },
     [sendMessage]
   );
+
+  // Combine local error with stream error
+  const displayError = error || streamError;
 
   const clearConversation = useCallback(() => {
     setMessages([]);
@@ -164,7 +156,7 @@ export function Chat() {
         ref={messagesContainerRef}
         role="log"
         aria-live="polite"
-        aria-busy={loading}
+        aria-busy={isStreaming}
         className="flex-1 overflow-y-auto p-4"
       >
         {messages.length === 0 ? (
@@ -222,45 +214,34 @@ export function Chat() {
               );
             })}
 
-            {/* Loading indicator */}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="max-w-[85%] rounded-lg bg-zinc-100 px-4 py-2 dark:bg-zinc-800">
-                  <div className="flex items-center gap-1">
-                    <div className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 dark:bg-zinc-500" />
-                    <div
-                      className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 dark:bg-zinc-500"
-                      style={{ animationDelay: "0.1s" }}
-                    />
-                    <div
-                      className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 dark:bg-zinc-500"
-                      style={{ animationDelay: "0.2s" }}
-                    />
-                  </div>
-                </div>
-              </div>
+            {/* Tool call indicator */}
+            {isStreaming && (
+              <ToolCallIndicator
+                activeToolCalls={activeToolCalls}
+                completedToolCalls={completedToolCalls}
+              />
             )}
           </div>
         )}
       </div>
 
       {/* Error display */}
-      {error && (
+      {displayError && (
         <div className="border-t border-red-200 bg-red-50 px-4 py-2 dark:border-red-900 dark:bg-red-950">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          <p className="text-sm text-red-600 dark:text-red-400">{displayError}</p>
         </div>
       )}
 
       {/* Input area */}
       <form onSubmit={handleSubmit} className="border-t border-zinc-200 p-4 dark:border-zinc-700">
-        <div className="flex items-end gap-2">
+        <div className="flex items-start gap-2">
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about your draft history..."
-            disabled={loading}
+            disabled={isStreaming}
             rows={1}
             aria-label="Ask a question about your drafts"
             className="max-h-40 flex-1 resize-none overflow-hidden rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-400 dark:focus:ring-zinc-500"
@@ -270,17 +251,17 @@ export function Chat() {
               type="button"
               onClick={clearConversation}
               aria-label="Clear conversation"
-              className="cursor-pointer rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:focus:ring-zinc-500 dark:focus:ring-offset-zinc-900"
+              className="cursor-pointer rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:focus:ring-zinc-500 dark:focus:ring-offset-zinc-900"
             >
               Clear
             </button>
           )}
           <button
             type="submit"
-            disabled={!input.trim() || loading}
-            className="cursor-pointer rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-500 dark:focus:ring-zinc-500 dark:focus:ring-offset-zinc-900"
+            disabled={!input.trim() || isStreaming}
+            className="cursor-pointer rounded-lg border border-transparent bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-500 dark:focus:ring-zinc-500 dark:focus:ring-offset-zinc-900"
           >
-            {loading ? "..." : "Send"}
+            {isStreaming ? "..." : "Send"}
           </button>
         </div>
       </form>

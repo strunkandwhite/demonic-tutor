@@ -5,8 +5,9 @@
 import OpenAI from "openai";
 import { tools, isValidToolName, type UserContext } from "./tools";
 import { executeToolCall } from "./handlers";
+import type { StreamEvent } from "./stream-types";
 
-const SYSTEM_PROMPT = `You are an expert limited Magic: The Gathering draft coach with deep knowledge of archetypes and formats. Your coaching is Socratic—always begin with clarifying questions to understand the player's reasoning and context before any critique. Engage in two-way dialogue, not monologue, and adjust based on user information.
+const SYSTEM_PROMPT = `You are an expert limited Magic: The Gathering draft coach with deep knowledge of archetypes and formats. CRITICAL: Always wrap every Magic card name in double brackets like [[Lightning Bolt]] for hover previews—no exceptions. Your coaching is Socratic—always begin with clarifying questions to understand the player's reasoning and context before any critique. Engage in two-way dialogue, not monologue, and adjust based on user information.
 
 ## Clarifying Questions
 Ask these when context is missing:
@@ -32,8 +33,8 @@ Adjust language based on available data:
 - **Partial data (picks only)**: Hedge your feedback. Note missing data. Do not critique deck building.
 - **Minimal data**: Only discuss signals/navigation; state format data is unavailable.
 Recap facts separately from interpretation:
-- Fact: "You took Card A over Card B at P1P5. Card B's ATA is 2.3, Card A's is 6.1."
-- Interpretation: "This suggests you may have overvalued Card A or had another reason to avoid Card B's color."
+- Fact: "You took [[Inspiring Overseer]] over [[Wedding Announcement]] at P1P5. [[Wedding Announcement]]'s ATA is 2.3, [[Inspiring Overseer]]'s is 6.1."
+- Interpretation: "This suggests you may have overvalued [[Inspiring Overseer]] or had another reason to avoid white."
 Do not present interpretation as fact; assume players have context you may not know.
 
 ## Critique Strategies
@@ -60,8 +61,16 @@ When offering critique, lead with Socratic commentary and questions—gather inf
 - [1] get_draft: draft_id=abc123, pick P1P5
 - [2] get_card_stats: card=Counterspell, set=FDN
 
-## Card Name Formatting
-Always wrap Magic card names in double brackets (e.g., [[Lightning Bolt]], [[Counterspell]]) for hover previews.`;
+## Card Name Formatting (MANDATORY)
+Wrap EVERY Magic card name in double brackets for hover previews. This applies to:
+- Every mention, not just the first (if you say [[Sheoldred]] twice, bracket it twice)
+- Cards from tool results, user questions, and your own references
+- Both well-known cards ([[Black Lotus]]) and obscure ones ([[Barreling Attack]])
+
+WRONG: "Sheoldred is a bomb. You should take Sheoldred early."
+RIGHT: "[[Sheoldred]] is a bomb. You should take [[Sheoldred]] early."
+
+Never skip brackets. The UI depends on them for card image previews.`;
 
 export const AVAILABLE_MODELS = ["gpt-5.2-2025-12-11", "gpt-4o-mini"] as const;
 export type ModelId = (typeof AVAILABLE_MODELS)[number];
@@ -168,6 +177,125 @@ export async function chat(
       : "";
 
   return {
+    text,
+    responseId: currentResponse.id,
+    model,
+    userContext: newUserContext,
+  };
+}
+
+/**
+ * Streaming chat with tool call events.
+ * Yields events as tool calls happen, then final response.
+ */
+export async function* chatStream(
+  message: string,
+  model: ModelId = "gpt-5.2-2025-12-11",
+  previousResponseId?: string,
+  userContext?: UserContext
+): AsyncGenerator<StreamEvent> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    yield { type: "error", message: "OPENAI_API_KEY environment variable is not set" };
+    return;
+  }
+
+  const openai = new OpenAI({
+    apiKey,
+    timeout: 10 * 60 * 1000,
+    maxRetries: 0,
+  });
+
+  const instructions = buildInstructions(userContext);
+
+  let currentResponse;
+  try {
+    currentResponse = await openai.responses.create({
+      model,
+      instructions,
+      ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
+      input: message,
+      tools,
+      reasoning: { effort: "medium" },
+    });
+  } catch (err) {
+    yield { type: "error", message: err instanceof Error ? err.message : "OpenAI request failed" };
+    return;
+  }
+
+  let newUserContext: UserContext | undefined = userContext;
+
+  while (currentResponse.output.some((o) => o.type === "function_call")) {
+    const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
+
+    for (const output of currentResponse.output) {
+      if (output.type === "function_call") {
+        const name = output.name;
+
+        if (!isValidToolName(name)) {
+          toolResults.push({
+            type: "function_call_output",
+            call_id: output.call_id,
+            output: JSON.stringify({ error: `Unknown tool: ${name}` }),
+          });
+          continue;
+        }
+
+        const args = JSON.parse(output.arguments);
+
+        // Yield tool call start event
+        yield {
+          type: "tool_call_start",
+          call_id: output.call_id,
+          name,
+          arguments: args,
+        };
+
+        const result = await executeToolCall(name, args);
+
+        // Yield tool call complete event
+        yield {
+          type: "tool_call_complete",
+          call_id: output.call_id,
+        };
+
+        toolResults.push({
+          type: "function_call_output",
+          call_id: output.call_id,
+          output: result.output,
+        });
+
+        if (result.userContext) {
+          newUserContext = result.userContext;
+        }
+      }
+    }
+
+    try {
+      currentResponse = await openai.responses.create({
+        model,
+        previous_response_id: currentResponse.id,
+        input: toolResults,
+        tools,
+        reasoning: { effort: "medium" },
+      });
+    } catch (err) {
+      yield {
+        type: "error",
+        message: err instanceof Error ? err.message : "OpenAI request failed",
+      };
+      return;
+    }
+  }
+
+  const textOutput = currentResponse.output.find((o) => o.type === "message");
+  const text =
+    textOutput?.type === "message"
+      ? textOutput.content.map((c) => (c.type === "output_text" ? c.text : "")).join("")
+      : "";
+
+  yield {
+    type: "final_response",
     text,
     responseId: currentResponse.id,
     model,
