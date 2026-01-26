@@ -7,7 +7,7 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next.js requires these
       "style-src 'self' 'unsafe-inline'", // Tailwind uses inline styles
-      "img-src 'self' https://cards.scryfall.io data:", // Scryfall card images
+      "img-src 'self' https://cards.scryfall.io https://api.scryfall.com data:", // Scryfall card images
       "font-src 'self'",
       "connect-src 'self'",
       "frame-ancestors 'none'",

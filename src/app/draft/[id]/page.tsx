@@ -3,9 +3,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ColorSymbols } from "@/app/components/ColorSymbols";
 import { FormatBadge } from "@/app/components/FormatBadge";
+import { PickRow } from "@/app/components/PickRow";
 
 interface Props {
   params: Promise<{ id: string }>;
+}
+
+function parseAvailableCards(json: string): string[] {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return [];
+  }
 }
 
 export default async function DraftPage({ params }: Props) {
@@ -96,20 +105,12 @@ export default async function DraftPage({ params }: Props) {
               </div>
               <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
                 {(packs[packNum] || []).map((pick) => (
-                  <div
+                  <PickRow
                     key={pick.pick_number}
-                    className="flex items-center gap-4 bg-white p-4 transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-                  >
-                    <div className="w-8 text-sm text-zinc-500 dark:text-zinc-400">
-                      P{pick.pick_number + 1}
-                    </div>
-                    <div className="flex-1 font-medium text-zinc-900 dark:text-zinc-100">
-                      {pick.card_name}
-                    </div>
-                    <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                      {JSON.parse(pick.available_cards).length} cards available
-                    </div>
-                  </div>
+                    pickNumber={pick.pick_number}
+                    cardName={pick.card_name}
+                    availableCards={parseAvailableCards(pick.available_cards)}
+                  />
                 ))}
               </div>
             </div>

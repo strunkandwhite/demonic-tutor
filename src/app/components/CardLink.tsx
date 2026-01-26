@@ -42,7 +42,10 @@ export function CardLink({ name }: CardLinkProps) {
     >
       {name}
       {showPreview && imageUrl && (
-        <span className="fixed z-50" style={{ top: position.top, left: position.left }}>
+        <span
+          className="pointer-events-none fixed z-50"
+          style={{ top: position.top, left: position.left }}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl}

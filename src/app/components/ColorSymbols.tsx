@@ -1,6 +1,6 @@
 /**
  * Mana symbol rendering for deck colors.
- * Uses Scryfall SVG images.
+ * Uses local SVG files (downloaded from Scryfall).
  * Uppercase = main colors (larger), lowercase = splashes (smaller).
  */
 
@@ -25,7 +25,7 @@ export function ColorSymbols({ colors }: ColorSymbolsProps) {
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
           key={i}
-          src={`https://svgs.scryfall.io/card-symbols/${sym.color}.svg`}
+          src={`/mana/${sym.color}.svg`}
           alt={sym.color}
           width={sym.isSplash ? 12 : 16}
           height={sym.isSplash ? 12 : 16}
