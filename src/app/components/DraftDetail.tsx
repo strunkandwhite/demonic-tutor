@@ -165,6 +165,7 @@ export function DraftDetail({ draftId }: DraftDetailProps) {
               {(packs[packNum] || []).map((pick) => (
                 <PickRow
                   key={pick.pick_number}
+                  packNumber={pick.pack_number}
                   pickNumber={pick.pick_number}
                   cardName={pick.card_name}
                   availableCards={parseAvailableCards(pick.available_cards)}

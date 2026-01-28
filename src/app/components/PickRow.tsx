@@ -6,6 +6,7 @@ import { ManaSymbols } from "./ManaSymbols";
 import type { CardData } from "@/core/db/queries";
 
 interface PickRowProps {
+  packNumber: number;
   pickNumber: number;
   cardName: string;
   availableCards: string[];
@@ -40,8 +41,17 @@ function CardDisplay({
   );
 }
 
-export function PickRow({ pickNumber, cardName, availableCards, cardData }: PickRowProps) {
+export function PickRow({
+  packNumber,
+  pickNumber,
+  cardName,
+  availableCards,
+  cardData,
+}: PickRowProps) {
   const [expanded, setExpanded] = useState(false);
+
+  // 17lands sometimes doesn't capture full P1P1 pack data
+  const isIncompleteP1P1 = packNumber === 0 && pickNumber === 0 && availableCards.length <= 1;
 
   return (
     <div className="bg-white transition-colors dark:bg-zinc-900">
@@ -57,16 +67,22 @@ export function PickRow({ pickNumber, cardName, availableCards, cardData }: Pick
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
-        aria-label={`Pick ${pickNumber + 1}: ${cardName}. ${availableCards.length} cards were available.`}
+        aria-label={
+          isIncompleteP1P1
+            ? `Pick ${pickNumber + 1}: ${cardName}.`
+            : `Pick ${pickNumber + 1}: ${cardName}. ${availableCards.length} cards were available.`
+        }
       >
         <div className="w-8 text-sm text-zinc-500 dark:text-zinc-400">P{pickNumber + 1}</div>
         <div className="flex-1 text-zinc-900 dark:text-zinc-100">
           <CardDisplay name={cardName} cardData={cardData} isBold size="md" />
         </div>
-        <div className="flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400">
-          <span className={`transition-transform ${expanded ? "rotate-90" : ""}`}>▶</span>
-          {availableCards.length} cards available
-        </div>
+        {!isIncompleteP1P1 && (
+          <div className="flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <span className={`transition-transform ${expanded ? "rotate-90" : ""}`}>▶</span>
+            {availableCards.length} cards available
+          </div>
+        )}
       </div>
       {expanded && (
         <div className="border-t border-zinc-100 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
