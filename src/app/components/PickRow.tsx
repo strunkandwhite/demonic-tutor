@@ -2,14 +2,45 @@
 
 import { useState } from "react";
 import { CardLink } from "./CardLink";
+import { ManaSymbols } from "./ManaSymbols";
+import type { CardData } from "@/core/db/queries";
 
 interface PickRowProps {
   pickNumber: number;
   cardName: string;
   availableCards: string[];
+  cardData?: Record<string, CardData>;
 }
 
-export function PickRow({ pickNumber, cardName, availableCards }: PickRowProps) {
+function formatGihWr(gihWr: number | null | undefined): string {
+  if (gihWr == null) return "-";
+  return `${(gihWr * 100).toFixed(1)}%`;
+}
+
+function CardDisplay({
+  name,
+  cardData,
+  isBold,
+  size = "sm",
+}: {
+  name: string;
+  cardData?: Record<string, CardData>;
+  isBold?: boolean;
+  size?: "sm" | "md";
+}) {
+  const data = cardData?.[name];
+  const gihWr = formatGihWr(data?.gihWr);
+
+  return (
+    <span className={`inline-flex items-center gap-1 ${isBold ? "font-bold" : ""}`}>
+      <ManaSymbols manaCost={data?.manaCost ?? null} size={size} />
+      <span className="text-zinc-500 dark:text-zinc-400">[{gihWr}]</span>
+      <CardLink name={name} />
+    </span>
+  );
+}
+
+export function PickRow({ pickNumber, cardName, availableCards, cardData }: PickRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -26,10 +57,11 @@ export function PickRow({ pickNumber, cardName, availableCards }: PickRowProps) 
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
+        aria-label={`Pick ${pickNumber + 1}: ${cardName}. ${availableCards.length} cards were available.`}
       >
         <div className="w-8 text-sm text-zinc-500 dark:text-zinc-400">P{pickNumber + 1}</div>
-        <div className="flex-1 font-medium text-zinc-900 dark:text-zinc-100">
-          <CardLink name={cardName} />
+        <div className="flex-1 text-zinc-900 dark:text-zinc-100">
+          <CardDisplay name={cardName} cardData={cardData} isBold size="md" />
         </div>
         <div className="flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400">
           <span className={`transition-transform ${expanded ? "rotate-90" : ""}`}>▶</span>
@@ -38,18 +70,18 @@ export function PickRow({ pickNumber, cardName, availableCards }: PickRowProps) 
       </div>
       {expanded && (
         <div className="border-t border-zinc-100 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/50">
-          <div className="ml-8 flex flex-wrap gap-x-2 gap-y-1 text-sm">
-            {availableCards.map((card, i) => (
+          <div className="ml-8 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+            {availableCards.map((card, index) => (
               <span
-                key={i}
+                key={card}
                 className={
                   card === cardName
-                    ? "font-bold text-zinc-900 dark:text-zinc-100"
+                    ? "text-zinc-900 dark:text-zinc-100"
                     : "text-zinc-700 dark:text-zinc-300"
                 }
               >
-                <CardLink name={card} />
-                {i < availableCards.length - 1 && ","}
+                <CardDisplay name={card} cardData={cardData} isBold={card === cardName} />
+                {index < availableCards.length - 1 && ","}
               </span>
             ))}
           </div>

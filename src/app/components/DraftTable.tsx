@@ -1,7 +1,9 @@
-import { listDrafts } from "@/core/db/queries";
-import Link from "next/link";
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
 import { ColorSymbols } from "./ColorSymbols";
 import { FormatBadge } from "./FormatBadge";
+import type { Draft } from "@/core/db/schema";
 
 function RankDisplay({ startRank, endRank }: { startRank: string | null; endRank: string | null }) {
   if (!startRank && !endRank) {
@@ -21,21 +23,19 @@ function RankDisplay({ startRank, endRank }: { startRank: string | null; endRank
 }
 
 interface DraftTableProps {
+  drafts: Draft[];
   set?: string;
 }
 
-export async function DraftTable({ set }: DraftTableProps) {
-  let drafts;
-  try {
-    drafts = await listDrafts({ set, limit: 20 });
-  } catch (error) {
-    console.error("Failed to load drafts:", error);
-    return (
-      <div className="rounded-lg border border-zinc-200 bg-white p-6 text-center text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
-        Unable to load drafts
-      </div>
-    );
-  }
+export function DraftTable({ drafts, set }: DraftTableProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const selectDraft = (id: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("draft", id);
+    router.push(`/?${params.toString()}`);
+  };
 
   if (drafts.length === 0) {
     return (
@@ -84,15 +84,21 @@ export async function DraftTable({ set }: DraftTableProps) {
           {drafts.map((draft) => (
             <tr
               key={draft.id}
-              className="bg-white transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+              onClick={() => selectDraft(draft.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  selectDraft(draft.id);
+                }
+              }}
+              tabIndex={0}
+              role="button"
+              className="cursor-pointer bg-white transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset dark:bg-zinc-900 dark:hover:bg-zinc-800"
             >
               <td className="px-4 py-3">
-                <Link
-                  href={`/draft/${draft.id}`}
-                  className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
-                >
+                <span className="text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300">
                   {new Date(draft.draft_date).toLocaleDateString()}
-                </Link>
+                </span>
               </td>
               <td className="px-4 py-3 font-mono text-sm text-zinc-900 dark:text-zinc-100">
                 {draft.set}

@@ -1,4 +1,5 @@
-import { getDraft } from "@/core/db/queries";
+import { getDraftWithCardData } from "@/core/db/queries";
+import { parseAvailableCards } from "@/core/db/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ColorSymbols } from "@/app/components/ColorSymbols";
@@ -9,17 +10,9 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-function parseAvailableCards(json: string): string[] {
-  try {
-    return JSON.parse(json);
-  } catch {
-    return [];
-  }
-}
-
 export default async function DraftPage({ params }: Props) {
   const { id } = await params;
-  const { draft, picks } = await getDraft(id);
+  const { draft, picks, cardData } = await getDraftWithCardData(id);
 
   if (!draft) {
     notFound();
@@ -110,6 +103,7 @@ export default async function DraftPage({ params }: Props) {
                     pickNumber={pick.pick_number}
                     cardName={pick.card_name}
                     availableCards={parseAvailableCards(pick.available_cards)}
+                    cardData={cardData}
                   />
                 ))}
               </div>

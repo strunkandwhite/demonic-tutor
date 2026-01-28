@@ -6,9 +6,11 @@
 
 interface ColorSymbolsProps {
   colors: string | null;
+  /** sm = 10px (inline), md = 12-16px (default) */
+  size?: "sm" | "md";
 }
 
-export function ColorSymbols({ colors }: ColorSymbolsProps) {
+export function ColorSymbols({ colors, size = "md" }: ColorSymbolsProps) {
   if (!colors) {
     return <span className="text-zinc-400 dark:text-zinc-500">-</span>;
   }
@@ -19,6 +21,10 @@ export function ColorSymbols({ colors }: ColorSymbolsProps) {
     isSplash: char === char.toLowerCase(),
   }));
 
+  // Size variants
+  const baseSize = size === "sm" ? 10 : 16;
+  const splashSize = size === "sm" ? 8 : 12;
+
   return (
     <span className="inline-flex items-center gap-0.5">
       {symbols.map((sym, i) => (
@@ -27,8 +33,8 @@ export function ColorSymbols({ colors }: ColorSymbolsProps) {
           key={i}
           src={`/mana/${sym.color}.svg`}
           alt={sym.color}
-          width={sym.isSplash ? 12 : 16}
-          height={sym.isSplash ? 12 : 16}
+          width={sym.isSplash ? splashSize : baseSize}
+          height={sym.isSplash ? splashSize : baseSize}
           className={sym.isSplash ? "inline-block opacity-60" : "inline-block"}
         />
       ))}

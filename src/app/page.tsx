@@ -1,8 +1,9 @@
 import { Chat } from "./components/Chat";
 import { StatsCards } from "./components/StatsCards";
 import { DraftTable } from "./components/DraftTable";
+import { DraftDetail } from "./components/DraftDetail";
 import { SetFilter } from "./components/SetFilter";
-import { getDistinctSets } from "@/core/db/queries";
+import { getDistinctSets, listDrafts } from "@/core/db/queries";
 import { Suspense } from "react";
 
 function LoadingSkeleton({ className }: { className?: string }) {
@@ -10,11 +11,21 @@ function LoadingSkeleton({ className }: { className?: string }) {
 }
 
 interface HomeProps {
-  searchParams: Promise<{ set?: string }>;
+  searchParams: Promise<{ set?: string; draft?: string }>;
+}
+
+async function DraftSection({ set, draft }: { set?: string; draft?: string }) {
+  const drafts = await listDrafts({ set, limit: 20 });
+
+  if (draft) {
+    return <DraftDetail draftId={draft} />;
+  }
+
+  return <DraftTable drafts={drafts} set={set} />;
 }
 
 export default async function Home({ searchParams }: HomeProps) {
-  const { set } = await searchParams;
+  const { set, draft } = await searchParams;
   const sets = await getDistinctSets();
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -40,19 +51,23 @@ export default async function Home({ searchParams }: HomeProps) {
 
         {/* Recent Drafts */}
         <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-              Recent Drafts
-            </h2>
-            <SetFilter sets={sets} currentSet={set} />
-          </div>
-          <div className="mb-4">
-            <Suspense fallback={<LoadingSkeleton className="h-5 w-64" />}>
-              <StatsCards set={set} />
-            </Suspense>
-          </div>
+          {!draft && (
+            <>
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+                  Recent Drafts
+                </h2>
+                <SetFilter sets={sets} currentSet={set} />
+              </div>
+              <div className="mb-4">
+                <Suspense fallback={<LoadingSkeleton className="h-5 w-64" />}>
+                  <StatsCards set={set} />
+                </Suspense>
+              </div>
+            </>
+          )}
           <Suspense fallback={<LoadingSkeleton className="h-64" />}>
-            <DraftTable set={set} />
+            <DraftSection set={set} draft={draft} />
           </Suspense>
         </section>
 
