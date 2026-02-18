@@ -18,7 +18,6 @@
     "augment-cards": "tsx src/augment/index.ts",
     "db:migrate": "tsx src/core/db/migrate.ts",
     "predev": "pnpm sync",
-    "prebuild": "pnpm sync",
     "prepare": "husky"
   },
   "dependencies": {
