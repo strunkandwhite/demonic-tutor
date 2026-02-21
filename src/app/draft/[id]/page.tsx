@@ -2,6 +2,7 @@ import { getDraftWithCardData } from "@/core/db/queries";
 import { parseAvailableCards } from "@/core/db/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Chat } from "@/app/components/Chat";
 import { ColorSymbols } from "@/app/components/ColorSymbols";
 import { FormatBadge } from "@/app/components/FormatBadge";
 import { PickRow } from "@/app/components/PickRow";
@@ -45,6 +46,11 @@ export default async function DraftPage({ params }: Props) {
           </h1>
           <FormatBadge format={draft.format} />
         </div>
+
+        {/* Chat */}
+        <section className="mb-8">
+          <Chat draftId={id} />
+        </section>
 
         {/* Stats Card */}
         <div className="mb-8 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
