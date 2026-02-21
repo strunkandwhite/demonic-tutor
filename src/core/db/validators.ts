@@ -4,7 +4,15 @@
  */
 
 import type { Row } from "@libsql/client";
-import type { Draft, Pick, CardStats, Decklist, FormatColorStats, FormatPlayDraw } from "./schema";
+import type {
+  Draft,
+  Pick,
+  CardStats,
+  Decklist,
+  FormatColorStats,
+  FormatPlayDraw,
+  Game,
+} from "./schema";
 
 /**
  * Safely extract a value from a row with type checking.
@@ -132,5 +140,23 @@ export function mapFormatPlayDraw(row: Row): FormatPlayDraw {
     play_win_rate: getNumber(row, "play_win_rate"),
     sample_size: getNumber(row, "sample_size"),
     updated_at: getString(row, "updated_at"),
+  };
+}
+
+/**
+ * Map a database row to a Game object with validation.
+ */
+export function mapGame(row: Row): Game {
+  return {
+    id: getString(row, "id"),
+    draft_id: getStringOrNull(row, "draft_id"),
+    game_number: getNumber(row, "game_number"),
+    game_time: getString(row, "game_time"),
+    on_play: getNumber(row, "on_play"),
+    won: getNumber(row, "won"),
+    turns: getNumberOrNull(row, "turns"),
+    event_name: getStringOrNull(row, "event_name"),
+    orphaned: getNumberOrNull(row, "orphaned"),
+    replay_link: getStringOrNull(row, "replay_link"),
   };
 }

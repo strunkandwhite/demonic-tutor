@@ -3,7 +3,15 @@
  */
 
 import { getClient } from "./client";
-import type { Draft, Pick, CardStats, Card, FormatColorStats, FormatPlayDraw } from "./schema";
+import type {
+  Draft,
+  Pick,
+  CardStats,
+  Card,
+  FormatColorStats,
+  FormatPlayDraw,
+  Game,
+} from "./schema";
 import {
   mapDraft,
   mapPick,
@@ -11,6 +19,7 @@ import {
   mapDecklist,
   mapFormatColorStats,
   mapFormatPlayDraw,
+  mapGame,
 } from "./validators";
 import { deriveArchetypeTags } from "../llm/archetype-tags";
 
@@ -91,6 +100,7 @@ export interface CardData {
 export async function getDraftWithCardData(draftId: string): Promise<{
   draft: Draft | null;
   picks: Pick[];
+  games: Game[];
   cardData: Record<string, CardData>;
 }> {
   const db = await getClient();
@@ -103,7 +113,7 @@ export async function getDraftWithCardData(draftId: string): Promise<{
 
   const draft = draftResult.rows[0] ? mapDraft(draftResult.rows[0]) : null;
   if (!draft) {
-    return { draft: null, picks: [], cardData: {} };
+    return { draft: null, picks: [], games: [], cardData: {} };
   }
 
   // Get picks
@@ -112,6 +122,13 @@ export async function getDraftWithCardData(draftId: string): Promise<{
     args: [draftId],
   });
   const picks = picksResult.rows.map(mapPick);
+
+  // Get games
+  const gamesResult = await db.execute({
+    sql: "SELECT * FROM games WHERE draft_id = ? ORDER BY game_number",
+    args: [draftId],
+  });
+  const games = gamesResult.rows.map(mapGame);
 
   // Collect all unique card names (picked cards + available cards)
   const allCardNames = new Set<string>();
@@ -128,7 +145,7 @@ export async function getDraftWithCardData(draftId: string): Promise<{
   }
 
   if (allCardNames.size === 0) {
-    return { draft, picks, cardData: {} };
+    return { draft, picks, games, cardData: {} };
   }
 
   // Query card mana costs
@@ -173,7 +190,7 @@ export async function getDraftWithCardData(draftId: string): Promise<{
     }
   }
 
-  return { draft, picks, cardData };
+  return { draft, picks, games, cardData };
 }
 
 export interface MyStatsParams {

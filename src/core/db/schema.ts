@@ -62,6 +62,7 @@ export interface Game {
   turns: number | null;
   event_name: string | null;
   orphaned: number | null;
+  replay_link: string | null;
 }
 
 export interface Decklist {
