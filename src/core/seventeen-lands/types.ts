@@ -41,16 +41,6 @@ export interface SeventeenLandsDraftDetail {
   expansion: string;
   num_seats: number;
   picks: SeventeenLandsPick[];
-  card_performance_data: Record<
-    string,
-    {
-      total_times_seen: number;
-      avg_seen_position: number;
-      total_times_picked: number;
-      avg_pick_position: number;
-      game_in_hand_win_rate: number | null;
-    }
-  >;
 }
 
 export interface SeventeenLandsGame {
@@ -191,4 +181,17 @@ export interface SeventeenLandsTrophyDeck {
   time: string;
   /** Whether the draft picks are available */
   has_draft: boolean;
+}
+
+/**
+ * Card rating stats from the 17lands /card_ratings/data endpoint.
+ * Aggregated Bo1 stats across all users for a set.
+ */
+export interface SeventeenLandsCardRating {
+  name: string;
+  avg_seen: number | null;
+  avg_pick: number | null;
+  seen_count: number;
+  pick_count: number;
+  ever_drawn_win_rate: number | null;
 }

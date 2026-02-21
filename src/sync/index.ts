@@ -295,9 +295,6 @@ async function sync() {
       // Insert picks and cards
       await insertPicksAndCards(db, draft.id, detail);
 
-      // Update card stats
-      await updateCardStats(db, draft.expansion, detail);
-
       syncedSets[draft.expansion] = (syncedSets[draft.expansion] || 0) + 1;
 
       // Note: Rate limiting handled by client.enforceRateLimit()
@@ -437,50 +434,6 @@ async function insertPicksAndCards(
   console.log(
     `[turso] Inserted ${pickData.length} picks and ${cards.length} cards for draft ${draftId}`
   );
-}
-
-async function updateCardStats(db: DbClient, set: string, detail: SeventeenLandsDraftDetail) {
-  const now = new Date().toISOString();
-  const cardEntries = Object.entries(detail.card_performance_data);
-
-  if (cardEntries.length === 0) return;
-
-  const statements: Array<{ sql: string; args: InValue[] }> = [];
-  const BATCH_SIZE = 50;
-
-  // Batch insert card names to ensure they exist
-  for (let i = 0; i < cardEntries.length; i += BATCH_SIZE) {
-    const batch = cardEntries.slice(i, i + BATCH_SIZE);
-    const placeholders = batch.map(() => "(?)").join(", ");
-    const args = batch.map(([cardName]) => cardName);
-    statements.push({
-      sql: `INSERT OR IGNORE INTO cards (name) VALUES ${placeholders}`,
-      args,
-    });
-  }
-
-  // Batch insert card stats
-  for (let i = 0; i < cardEntries.length; i += BATCH_SIZE) {
-    const batch = cardEntries.slice(i, i + BATCH_SIZE);
-    const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
-    const args = batch.flatMap(([cardName, stats]) => [
-      cardName,
-      set,
-      stats.avg_seen_position,
-      stats.avg_pick_position,
-      stats.game_in_hand_win_rate,
-      stats.total_times_seen,
-      stats.total_times_picked,
-      now,
-    ]);
-    statements.push({
-      sql: `INSERT OR REPLACE INTO card_stats (card_name, "set", avg_seen_at, avg_pick_at, game_in_hand_wr, times_seen, times_picked, updated_at) VALUES ${placeholders}`,
-      args,
-    });
-  }
-
-  await db.batch(statements);
-  console.log(`[turso] Updated stats for ${cardEntries.length} cards in ${set}`);
 }
 
 function extractColors(manaCost: string): string {

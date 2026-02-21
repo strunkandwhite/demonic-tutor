@@ -7,6 +7,7 @@ export type {
   SeventeenLandsEventDetails,
   SeventeenLandsDeck,
   SeventeenLandsColorRating,
+  SeventeenLandsCardRating,
   SeventeenLandsPlayDrawStats,
   SeventeenLandsTrophyDeck,
 } from "./types";

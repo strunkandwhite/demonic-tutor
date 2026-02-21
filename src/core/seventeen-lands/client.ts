@@ -11,6 +11,7 @@ import type {
   SeventeenLandsEventDetails,
   SeventeenLandsDeck,
   SeventeenLandsColorRating,
+  SeventeenLandsCardRating,
   SeventeenLandsPlayDrawStats,
   SeventeenLandsPlayDrawResponse,
   SeventeenLandsTrophyDeck,
@@ -374,6 +375,22 @@ export class SeventeenLandsClient {
     if (endDate) params.set("end_date", endDate);
     return withRetry(() =>
       this.fetchApi<SeventeenLandsColorRating[]>(`/color_ratings/data?${params}`)
+    );
+  }
+
+  async getCardRatings(
+    expansion: string,
+    format?: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<SeventeenLandsCardRating[]> {
+    log(`getCardRatings(${expansion}, ${format}, ${startDate}, ${endDate})`);
+    const params = new URLSearchParams({ expansion });
+    if (format) params.set("format", format);
+    if (startDate) params.set("start_date", startDate);
+    if (endDate) params.set("end_date", endDate);
+    return withRetry(() =>
+      this.fetchApi<SeventeenLandsCardRating[]>(`/card_ratings/data?${params}`)
     );
   }
 
