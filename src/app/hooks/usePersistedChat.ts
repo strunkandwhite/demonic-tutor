@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import type { UserContext } from "@/core/llm/tools";
 
-const STORAGE_KEY = "demonic-tutor-last-chat";
+const STORAGE_PREFIX = "demonic-tutor-chat-";
 const CURRENT_VERSION = 1;
 
 interface Message {
@@ -36,49 +36,49 @@ interface UsePersistedChatResult {
 
 const EMPTY_MESSAGES: Message[] = [];
 
-// Cache to ensure getSnapshot returns stable references
-let cachedRawValue: string | null = null;
-let cachedParsedValue: PersistedChat | null = null;
+// Cache to ensure getSnapshot returns stable references (per scope)
+const cache = new Map<string, { raw: string | null; parsed: PersistedChat | null }>();
 
 function subscribe() {
   // localStorage doesn't have change events we need to subscribe to
   return () => {};
 }
 
-function getSnapshot(): PersistedChat | null {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === cachedRawValue) {
-      return cachedParsedValue;
-    }
-    cachedRawValue = stored;
-    if (!stored) {
-      cachedParsedValue = null;
-      return null;
-    }
-    const parsed: PersistedChat = JSON.parse(stored);
-    if (parsed.version !== CURRENT_VERSION) {
-      cachedParsedValue = null;
-      return null;
-    }
-    if (!parsed.userMessage?.id || !parsed.assistantMessage?.id) {
-      cachedParsedValue = null;
-      return null;
-    }
-    cachedParsedValue = parsed;
-    return parsed;
-  } catch {
-    cachedRawValue = null;
-    cachedParsedValue = null;
-    return null;
-  }
-}
-
 function getServerSnapshot(): null {
   return null;
 }
 
-export function usePersistedChat(): UsePersistedChatResult {
+export function usePersistedChat(scope: string = "global"): UsePersistedChatResult {
+  const storageKey = `${STORAGE_PREFIX}${scope}`;
+
+  const getSnapshot = useCallback((): PersistedChat | null => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      const cached = cache.get(scope);
+      if (cached && stored === cached.raw) {
+        return cached.parsed;
+      }
+      if (!stored) {
+        cache.set(scope, { raw: null, parsed: null });
+        return null;
+      }
+      const parsed: PersistedChat = JSON.parse(stored);
+      if (parsed.version !== CURRENT_VERSION) {
+        cache.set(scope, { raw: stored, parsed: null });
+        return null;
+      }
+      if (!parsed.userMessage?.id || !parsed.assistantMessage?.id) {
+        cache.set(scope, { raw: stored, parsed: null });
+        return null;
+      }
+      cache.set(scope, { raw: stored, parsed });
+      return parsed;
+    } catch {
+      cache.set(scope, { raw: null, parsed: null });
+      return null;
+    }
+  }, [scope, storageKey]);
+
   const persistedChat = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const saveLastExchange = useCallback(
@@ -97,21 +97,22 @@ export function usePersistedChat(): UsePersistedChatResult {
         timestamp: Date.now(),
       };
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        localStorage.setItem(storageKey, JSON.stringify(data));
       } catch {
         // Storage full or unavailable
       }
     },
-    []
+    [storageKey]
   );
 
   const clearPersistedChat = useCallback(() => {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(storageKey);
+      cache.delete(scope);
     } catch {
       // Storage unavailable
     }
-  }, []);
+  }, [scope, storageKey]);
 
   return useMemo(
     () => ({
