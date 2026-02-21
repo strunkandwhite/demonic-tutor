@@ -37,21 +37,34 @@ function generateMessageId(): string {
   return `msg-${Date.now()}-${++messageIdCounter}`;
 }
 
-export function Chat() {
+interface ChatProps {
+  draftId?: string;
+}
+
+export function Chat({ draftId }: ChatProps) {
+  const chatScope = draftId ? `draft-${draftId}` : "global";
   const {
     initialMessages,
     initialResponseId,
     initialUserContext,
     saveLastExchange,
     clearPersistedChat,
-  } = usePersistedChat();
+  } = usePersistedChat(chatScope);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState<ModelId>("gpt-5.2-2025-12-11");
   const [responseId, setResponseId] = useState<string | null>(null);
-  const [userContext, setUserContext] = useState<UserContext | undefined>();
+  const [userContext, setUserContext] = useState<UserContext | undefined>(() => {
+    if (draftId) {
+      return {
+        intent: { mode: "maximize_wins", forced_archetype: null, constraints: [] },
+        currentDraftId: draftId,
+      };
+    }
+    return undefined;
+  });
   const hasHydrated = useRef(false);
 
   // Hydrate state from localStorage once on mount
@@ -61,10 +74,16 @@ export function Chat() {
       startTransition(() => {
         setMessages(initialMessages);
         setResponseId(initialResponseId);
-        setUserContext(initialUserContext);
+        setUserContext((prev) => {
+          const hydrated = initialUserContext ?? prev;
+          if (draftId && hydrated) {
+            return { ...hydrated, currentDraftId: draftId };
+          }
+          return hydrated;
+        });
       });
     }
-  }, [initialMessages, initialResponseId, initialUserContext]);
+  }, [initialMessages, initialResponseId, initialUserContext, draftId]);
 
   const {
     sendMessage: streamMessage,
@@ -161,7 +180,9 @@ export function Chat() {
     <div className="flex h-[600px] flex-col rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-800">
-        <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">Ask about your drafts</h2>
+        <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+          {draftId ? "Ask about this draft" : "Ask about your drafts"}
+        </h2>
         <select
           value={model}
           onChange={(e) => setModel(e.target.value as ModelId)}
@@ -186,7 +207,17 @@ export function Chat() {
         {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-center text-sm text-zinc-400 dark:text-zinc-500">
-              Try: &quot;How am I doing in FIN?&quot; or &quot;What&apos;s my best color pair?&quot;
+              {draftId ? (
+                <>
+                  Try: &quot;Review my picks&quot; or &quot;What were my best options in pack
+                  2?&quot;
+                </>
+              ) : (
+                <>
+                  Try: &quot;How am I doing in FIN?&quot; or &quot;What&apos;s my best color
+                  pair?&quot;
+                </>
+              )}
             </p>
           </div>
         ) : (
@@ -264,7 +295,7 @@ export function Chat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about your draft history..."
+            placeholder={draftId ? "Ask about this draft..." : "Ask about your draft history..."}
             disabled={isStreaming}
             rows={1}
             aria-label="Ask a question about your drafts"
