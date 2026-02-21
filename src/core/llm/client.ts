@@ -89,17 +89,28 @@ function buildInstructions(userContext?: UserContext): string {
     return SYSTEM_PROMPT;
   }
 
+  let instructions = SYSTEM_PROMPT;
+
   const { intent } = userContext;
   const archetypeDesc = intent.forced_archetype || "none";
   const constraintsDesc = intent.constraints.length > 0 ? intent.constraints.join(", ") : "none";
 
-  return `${SYSTEM_PROMPT}
+  instructions += `
 
 ## User Context
 The user has established the following intent:
 - Mode: ${intent.mode}
 - Forced Archetype: ${archetypeDesc}
 - Constraints: ${constraintsDesc}`;
+
+  if (userContext.currentDraftId) {
+    instructions += `
+
+## Current Draft Context
+The user is currently viewing a specific draft (ID: ${userContext.currentDraftId}). When they say "this draft", "my picks", or ask about picks/games without specifying a draft, default to draft_id=${userContext.currentDraftId}. Call \`get_draft\` with this ID to load context before responding to draft-specific questions.`;
+  }
+
+  return instructions;
 }
 
 export async function chat(

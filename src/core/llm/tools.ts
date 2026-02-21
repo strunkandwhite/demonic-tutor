@@ -15,6 +15,7 @@ export interface UserIntent {
 
 export interface UserContext {
   intent: UserIntent;
+  currentDraftId?: string;
 }
 
 export const tools: OpenAI.Responses.Tool[] = [
