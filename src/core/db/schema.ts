@@ -165,7 +165,8 @@ CREATE TABLE IF NOT EXISTS games (
   won INTEGER NOT NULL,
   turns INTEGER,
   event_name TEXT,
-  orphaned INTEGER DEFAULT 0
+  orphaned INTEGER DEFAULT 0,
+  replay_link TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_drafts_set ON drafts("set");

@@ -27,6 +27,22 @@ async function migrate() {
     }
   }
 
+  // Column additions (idempotent - ignores "duplicate column" errors)
+  const ALTER_STATEMENTS = ["ALTER TABLE games ADD COLUMN replay_link TEXT"];
+
+  for (const sql of ALTER_STATEMENTS) {
+    try {
+      await client.execute(sql);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "";
+      if (!msg.includes("duplicate column")) {
+        console.error("ALTER TABLE failed:", sql, error);
+        closeClient();
+        process.exit(1);
+      }
+    }
+  }
+
   console.log("Migrations complete.");
   closeClient();
 }
