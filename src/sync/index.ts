@@ -236,10 +236,10 @@ async function sync() {
       if (!dryRun) {
         await db.execute("DELETE FROM decklist_cards");
         await db.execute("DELETE FROM decklists");
+        await db.execute("DELETE FROM games");
         await db.execute("DELETE FROM picks");
         await db.execute("DELETE FROM card_stats");
         await db.execute("DELETE FROM drafts");
-        await db.execute("DELETE FROM games");
         await setSyncMetadata("last_sync_date", "");
       }
     }
