@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ColorSymbols } from "./ColorSymbols";
 import { FormatBadge } from "./FormatBadge";
 import { PickRow } from "./PickRow";
-import type { Draft, Pick } from "@/core/db/schema";
+import type { Draft, Pick, Game } from "@/core/db/schema";
 import type { CardData } from "@/core/db/queries";
 import { parseAvailableCards } from "@/core/db/utils";
 
@@ -17,6 +17,7 @@ interface DraftResponse {
   draft: Draft;
   picks: Pick[];
   cardData: Record<string, CardData>;
+  games: Game[];
 }
 
 export function DraftDetail({ draftId }: DraftDetailProps) {
@@ -83,7 +84,7 @@ export function DraftDetail({ draftId }: DraftDetailProps) {
     );
   }
 
-  const { draft, picks, cardData } = data;
+  const { draft, picks, cardData, games } = data;
 
   // Group picks by pack
   const packs: Record<number, typeof picks> = {};
@@ -149,6 +150,47 @@ export function DraftDetail({ draftId }: DraftDetailProps) {
             </>
           )}
         </div>
+
+        {/* Game Results */}
+        {games.length > 0 && (
+          <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+            <div className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">Games</div>
+            <div className="flex flex-wrap gap-2">
+              {games.map((game) => {
+                const pill = (
+                  <span
+                    key={game.id}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      game.won
+                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                    }`}
+                  >
+                    {game.won ? "W" : "L"}
+                    <span className="text-[10px] opacity-70">{game.on_play ? "P" : "D"}</span>
+                  </span>
+                );
+
+                if (game.replay_link) {
+                  return (
+                    <a
+                      key={game.id}
+                      href={`https://www.17lands.com${game.replay_link}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="transition-opacity hover:opacity-80"
+                      title={`Game ${game.game_number + 1}${game.turns ? ` (${game.turns} turns)` : ""} — View on 17lands`}
+                    >
+                      {pill}
+                    </a>
+                  );
+                }
+
+                return pill;
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Packs */}
