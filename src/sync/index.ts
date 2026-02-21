@@ -99,6 +99,7 @@ async function syncGames(
         won: game.won ? 1 : 0,
         turns: game.turns,
         eventName: game.event_name,
+        replayLink: game.link,
       };
     })
     .filter((g): g is NonNullable<typeof g> => g !== null);
@@ -114,7 +115,7 @@ async function syncGames(
 
   for (let i = 0; i < gameData.length; i += BATCH_SIZE) {
     const batch = gameData.slice(i, i + BATCH_SIZE);
-    const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+    const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
     const args = batch.flatMap((g) => [
       g.id,
       g.draftId,
@@ -124,9 +125,10 @@ async function syncGames(
       g.won,
       g.turns,
       g.eventName,
+      g.replayLink,
     ]);
     statements.push({
-      sql: `INSERT OR IGNORE INTO games (id, draft_id, game_number, game_time, on_play, won, turns, event_name) VALUES ${placeholders}`,
+      sql: `INSERT OR IGNORE INTO games (id, draft_id, game_number, game_time, on_play, won, turns, event_name, replay_link) VALUES ${placeholders}`,
       args,
     });
   }
