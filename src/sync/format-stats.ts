@@ -1,5 +1,5 @@
 /**
- * Sync format-level stats from 17lands: play/draw rates, color ratings, and trophy decklists.
+ * Sync format-level stats from 17lands: play/draw rates, color ratings, card stats, and trophy decklists.
  */
 
 import type {
@@ -58,6 +58,18 @@ async function wasColorStatsUpdatedThisWeek(db: DbClient, set: string): Promise<
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
   const result = await db.execute({
     sql: `SELECT 1 FROM format_color_stats WHERE "set" = ? AND updated_at >= ? LIMIT 1`,
+    args: [set, weekAgo],
+  });
+  return result.rows.length > 0;
+}
+
+/**
+ * Check if card_stats for a set was updated in the last week.
+ */
+async function wasCardStatsUpdatedThisWeek(db: DbClient, set: string): Promise<boolean> {
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const result = await db.execute({
+    sql: `SELECT 1 FROM card_stats WHERE "set" = ? AND updated_at >= ? LIMIT 1`,
     args: [set, weekAgo],
   });
   return result.rows.length > 0;
@@ -271,6 +283,66 @@ export async function syncFormatStats(
             });
           }
           console.log(`[turso] Upserted ${colorRatings.length} color ratings for ${set}`);
+        }
+      }
+
+      // Card stats: refresh weekly (PremierDraft/Bo1 aggregate data)
+      const cardStatsUpToDate = !dryRun && (await wasCardStatsUpdatedThisWeek(db, set));
+      if (cardStatsUpToDate) {
+        console.log(`Skipping ${set} card stats - already updated this week`);
+      } else {
+        console.log(`Syncing card stats for ${set}...`);
+
+        const cardRatings = await api.getCardRatings(set, "PremierDraft", startDate, endDate);
+        console.log(`  Found ${cardRatings.length} card ratings`);
+
+        if (dryRun) {
+          const sorted = [...cardRatings]
+            .filter((c) => c.ever_drawn_win_rate !== null)
+            .sort((a, b) => (b.ever_drawn_win_rate ?? 0) - (a.ever_drawn_win_rate ?? 0));
+          console.log(`  Top cards for ${set} by GIH WR:`);
+          for (const card of sorted.slice(0, 5)) {
+            console.log(
+              `    - ${card.name}: ${((card.ever_drawn_win_rate ?? 0) * 100).toFixed(1)}% GIH WR`
+            );
+          }
+          if (cardRatings.length > 5) {
+            console.log(`    ... and ${cardRatings.length - 5} more`);
+          }
+        } else {
+          const BATCH_SIZE = 50;
+
+          // Ensure all cards exist in cards table
+          for (let i = 0; i < cardRatings.length; i += BATCH_SIZE) {
+            const batch = cardRatings.slice(i, i + BATCH_SIZE);
+            const placeholders = batch.map(() => "(?)").join(", ");
+            const args = batch.map((c) => c.name);
+            await db.execute({
+              sql: `INSERT OR IGNORE INTO cards (name) VALUES ${placeholders}`,
+              args,
+            });
+          }
+
+          // Upsert card stats
+          for (let i = 0; i < cardRatings.length; i += BATCH_SIZE) {
+            const batch = cardRatings.slice(i, i + BATCH_SIZE);
+            const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+            const args = batch.flatMap((card) => [
+              card.name,
+              set,
+              card.avg_seen,
+              card.avg_pick,
+              card.ever_drawn_win_rate,
+              card.seen_count,
+              card.pick_count,
+              now,
+            ]);
+            await db.execute({
+              sql: `INSERT OR REPLACE INTO card_stats (card_name, "set", avg_seen_at, avg_pick_at, game_in_hand_wr, times_seen, times_picked, updated_at) VALUES ${placeholders}`,
+              args,
+            });
+          }
+          console.log(`[turso] Upserted ${cardRatings.length} card stats for ${set}`);
         }
       }
 
