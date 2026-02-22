@@ -46,7 +46,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
         {/* Chat */}
         <section className="mb-8">
-          <Chat />
+          <Chat draftId={draft} />
         </section>
 
         {/* Recent Drafts */}
