@@ -125,7 +125,7 @@ export async function getDraftWithCardData(draftId: string): Promise<{
 
   // Get games
   const gamesResult = await db.execute({
-    sql: "SELECT * FROM games WHERE draft_id = ? ORDER BY game_number",
+    sql: "SELECT * FROM games WHERE draft_id = ? ORDER BY game_time",
     args: [draftId],
   });
   const games = gamesResult.rows.map(mapGame);
