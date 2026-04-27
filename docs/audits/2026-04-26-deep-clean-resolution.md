@@ -20,8 +20,8 @@
 - **Task 1** — Refresh `CLAUDE.md` and `README.md` to match current
   codebase: 13 LLM tools, all schema tables (`decklists`, `decklist_cards`,
   `format_color_stats`, `format_play_draw`, `sync_metadata`), expanded
-  project structure, correct sync-step list and 1s delay, additional env
-  vars (`API_SECRET`, `SITE_ORIGIN`), `pnpm check` / `pnpm playwright:install`
+  project structure, correct sync-step list and 1s delay, the
+  `SITE_ORIGIN` env var, `pnpm check` / `pnpm playwright:install`
   commands. Added "Superseded by" header to the older
   `2026-01-23-demonic-tutor-design.md` plan.
 - **Task 2** — Deleted `src/core/llm/types.ts` (`MistakeReport`,
@@ -37,10 +37,7 @@
   `mailto:`, plus root-relative and fragment refs; everything else
   (`javascript:`, `data:`, `vbscript:`, `file:`) returns `""`. 10 unit
   tests cover the matrix.
-- **Task 6** — `instrumentation.ts` now throws when `API_SECRET` is unset
-  in production. Production gate is `VERCEL_ENV === "production"` on
-  Vercel, falling back to `NODE_ENV === "production"` off-Vercel.
-  Extracted `checkApiSecret(env)` for testing; 6 unit tests.
+- **Task 6** — _Reverted post-merge on 2026-04-27._ See "Addendum: API_SECRET removed" below.
 - **Task 7** — Same-origin POST check on `/api/chat/stream`. New
   `src/app/api/origin-check.ts::assertSameOrigin(request, env?)` compares
   `Origin` against `process.env.SITE_ORIGIN` (deliberately not derived
@@ -209,7 +206,6 @@ These need real network access and cannot be checked against a local dev server 
 
 | Source task     | Action                                                                                                                                                            |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Task 6          | Confirm `API_SECRET` is set in **Vercel Production** env (and Preview if you don't want preview deploys to start).                                                |
 | Task 7          | Confirm `SITE_ORIGIN` is set in all envs (Production, Preview, Dev) — the production startup will 500 every chat-stream POST without it.                          |
 | Task 12, 13, 15 | `pnpm sync` against real Turso. Compare `decklists`, `decklist_cards`, `format_play_draw`, `format_color_stats` row counts to a baseline.                         |
 | Task 14         | `pnpm sync`, then in `turso db shell`: `SELECT id, draft_id, game_number FROM games WHERE draft_id IS NOT NULL LIMIT 20` — confirm linked games still look right. |
@@ -233,3 +229,28 @@ These are the items the plan listed under "Deferred (out of plan)":
   cost-to-value. Real-traffic verification is deferred to host. The
   plan flagged this as the sandbox-safe option; I made the trade-off
   in the other direction. Documented in the Task 16 commit.
+
+## Addendum: API_SECRET removed (2026-04-27)
+
+Task 6 added a fail-closed-without-`API_SECRET` startup check, paired
+with a Bearer-token gate (`src/app/api/auth.ts::validateAuth`) on the
+chat-stream route. The two were broken in combination: the React
+client (`useChatStream`) never attached an `Authorization` header, so
+production with `API_SECRET` set 401'd every chat call, while
+production without it refused to start. The Bearer-token path was a
+vestige of the pre-Task-7 design — Task 7's same-origin POST check
+(`assertSameOrigin`) is the real CSRF defense for a browser-only
+single-user app.
+
+Removed in this rollback:
+
+- Deleted `src/app/api/auth.ts` and its sole call site in
+  `src/app/api/chat/stream/route.ts`.
+- Stripped `checkApiSecret` from `src/instrumentation.ts` and deleted
+  `src/instrumentation.test.ts` (the only thing it tested was the
+  removed function).
+- Updated `CLAUDE.md` to drop `API_SECRET` from the env-var list.
+
+Same-origin check stays as the only chat-route gate. Net: 165 tests
+(down from 171; the dropped 6 were `checkApiSecret` cases). Vercel no
+longer needs `API_SECRET` set.

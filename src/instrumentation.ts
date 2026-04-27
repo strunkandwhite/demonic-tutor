@@ -20,32 +20,4 @@ function validateEnvironment() {
       `Missing required environment variables: ${missing.join(", ")}. Please set these in your .env.local file.`
     );
   }
-
-  // API_SECRET: fail closed in production (Vercel or otherwise), warn in dev/preview.
-  checkApiSecret(process.env);
-}
-
-/**
- * Throws if API_SECRET is missing in production. Otherwise warns.
- *
- * Production detection:
- * - On Vercel deployments, gate on VERCEL_ENV === "production"
- *   (NODE_ENV is also "production" during `next build`, which would
- *   fail every Vercel build before env propagation — don't gate on it
- *   when we know we're on Vercel).
- * - For non-Vercel deploys, fall back to NODE_ENV === "production".
- */
-export function checkApiSecret(env: Record<string, string | undefined>): void {
-  if (env.API_SECRET) return;
-
-  const isVercelProduction = env.VERCEL_ENV === "production";
-  const isNonVercelProduction = !env.VERCEL_ENV && env.NODE_ENV === "production";
-
-  if (isVercelProduction || isNonVercelProduction) {
-    throw new Error(
-      "API_SECRET must be set in production - refusing to start with unauthenticated API endpoints"
-    );
-  }
-
-  console.warn("Warning: API_SECRET not set - API endpoints are unauthenticated");
 }

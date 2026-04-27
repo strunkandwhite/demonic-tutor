@@ -98,8 +98,7 @@ The sync system uses Playwright to authenticate with 17lands and bypass WAF prot
 - `TURSO_DATABASE_URL` - Turso database URL
 - `TURSO_AUTH_TOKEN` - Turso auth token
 - `OPENAI_API_KEY` - OpenAI API key
-- `API_SECRET` - Required in production (instrumentation.ts fails closed without it)
-- `SITE_ORIGIN` - Used by chat POST endpoints for same-origin checks
+- `SITE_ORIGIN` - Required in production. Same-origin check on chat POST endpoints; mismatch → 403, missing → 500.
 
 ## LLM Tools Available
 
