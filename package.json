@@ -17,6 +17,7 @@
     "sync": "tsx src/sync/index.ts",
     "augment-cards": "tsx src/augment/index.ts",
     "db:migrate": "tsx src/core/db/migrate.ts",
+    "playwright:install": "playwright install chromium",
     "predev": "pnpm sync",
     "prepare": "husky"
   },
