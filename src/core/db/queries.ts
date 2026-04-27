@@ -143,39 +143,25 @@ export async function getDraftWithCardData(draftId: string): Promise<{
     return { draft, picks, games, cardData: {} };
   }
 
-  // Query card mana costs
+  // Single LEFT JOIN: keep cards present in `cards` but missing from
+  // `card_stats` (gihWr ends up null for those).
   const cardNames = Array.from(allCardNames);
   const placeholders = cardNames.map(() => "?").join(", ");
   const cardsResult = await db.execute({
-    sql: `SELECT name, mana_cost FROM cards WHERE name IN (${placeholders})`,
-    args: cardNames,
-  });
-
-  // Query GIH WR from card_stats for this set
-  const statsResult = await db.execute({
-    sql: `SELECT card_name, game_in_hand_wr FROM card_stats WHERE "set" = ? AND card_name IN (${placeholders})`,
+    sql: `SELECT c.name, c.mana_cost, cs.game_in_hand_wr
+          FROM cards c
+          LEFT JOIN card_stats cs ON cs.card_name = c.name AND cs."set" = ?
+          WHERE c.name IN (${placeholders})`,
     args: [draft.set, ...cardNames],
   });
 
-  // Build cardData map
   const cardData: Record<string, CardData> = {};
-
-  // Initialize with mana costs
   for (const row of cardsResult.rows) {
     const name = row.name as string;
     cardData[name] = {
       manaCost: row.mana_cost as string | null,
-      gihWr: null,
+      gihWr: row.game_in_hand_wr as number | null,
     };
-  }
-
-  // Add GIH WR
-  for (const row of statsResult.rows) {
-    const name = row.card_name as string;
-    if (!cardData[name]) {
-      cardData[name] = { manaCost: null, gihWr: null };
-    }
-    cardData[name].gihWr = row.game_in_hand_wr as number | null;
   }
 
   // Ensure all card names have entries (even if no data found)
