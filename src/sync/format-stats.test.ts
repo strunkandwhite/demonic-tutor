@@ -1,11 +1,107 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Client } from "@libsql/client";
 import { createTestDb } from "@/test/db";
-import { upsertColorRatingsBatch, upsertPlayDrawBatch } from "./format-stats";
+import {
+  extractMainColors,
+  selectDiverseTrophyDecks,
+  upsertColorRatingsBatch,
+  upsertPlayDrawBatch,
+} from "./format-stats";
 import type {
   SeventeenLandsColorRating,
   SeventeenLandsPlayDrawStats,
+  SeventeenLandsTrophyDeck,
 } from "@/core/seventeen-lands";
+
+function makeTrophy(
+  partial: Partial<SeventeenLandsTrophyDeck> & { aggregate_id: string; colors: string }
+): SeventeenLandsTrophyDeck {
+  return {
+    wins: 7,
+    losses: 0,
+    start_rank: "Gold-1",
+    end_rank: "Platinum-4",
+    deck_index: 0,
+    time: "2026-01-01 00:00:00",
+    has_draft: true,
+    ...partial,
+  };
+}
+
+describe("extractMainColors", () => {
+  it("returns uppercase main colors only", () => {
+    expect(extractMainColors("WU")).toBe("WU");
+    expect(extractMainColors("BG")).toBe("BG");
+  });
+
+  it("strips lowercase splash colors", () => {
+    expect(extractMainColors("BGr")).toBe("BG");
+    expect(extractMainColors("URwb")).toBe("UR");
+  });
+
+  it("sorts colors in WUBRG order", () => {
+    expect(extractMainColors("UB")).toBe("UB");
+    expect(extractMainColors("BU")).toBe("UB"); // re-sorted
+    expect(extractMainColors("RGW")).toBe("WRG");
+  });
+
+  it("returns empty string when there are no main colors", () => {
+    expect(extractMainColors("")).toBe("");
+    expect(extractMainColors("rgb")).toBe("");
+  });
+});
+
+describe("selectDiverseTrophyDecks", () => {
+  it("returns empty for empty input", () => {
+    expect(selectDiverseTrophyDecks([])).toEqual([]);
+  });
+
+  it("caps at 5 decks per color pair", () => {
+    const decks = Array.from({ length: 8 }, (_, i) =>
+      makeTrophy({ aggregate_id: `wu-${i}`, colors: "WU", losses: i })
+    );
+    const result = selectDiverseTrophyDecks(decks);
+    expect(result).toHaveLength(5);
+    // Sorted by losses ascending — first 5 of [0..7] = [0..4]
+    expect(result.map((d) => d.aggregate_id)).toEqual(["wu-0", "wu-1", "wu-2", "wu-3", "wu-4"]);
+  });
+
+  it("keeps up to 5 per pair across multiple color pairs", () => {
+    const decks = [
+      ...Array.from({ length: 3 }, (_, i) =>
+        makeTrophy({ aggregate_id: `wu-${i}`, colors: "WU", losses: 0 })
+      ),
+      ...Array.from({ length: 6 }, (_, i) =>
+        makeTrophy({ aggregate_id: `bg-${i}`, colors: "BG", losses: i })
+      ),
+    ];
+    const result = selectDiverseTrophyDecks(decks);
+    // 3 WU + 5 BG = 8 total
+    expect(result).toHaveLength(8);
+    expect(result.filter((d) => d.colors === "WU")).toHaveLength(3);
+    expect(result.filter((d) => d.colors === "BG")).toHaveLength(5);
+  });
+
+  it("caps total result at 30", () => {
+    // 10 color pairs × 5 decks each = 50; should cap at 30
+    const colorPairs = ["WU", "WB", "WR", "WG", "UB", "UR", "UG", "BR", "BG", "RG"];
+    const decks = colorPairs.flatMap((colors) =>
+      Array.from({ length: 5 }, (_, i) => makeTrophy({ aggregate_id: `${colors}-${i}`, colors }))
+    );
+    const result = selectDiverseTrophyDecks(decks);
+    expect(result).toHaveLength(30);
+  });
+
+  it("treats splash variants of the same main pair as one bucket", () => {
+    const decks = [
+      makeTrophy({ aggregate_id: "wu-clean", colors: "WU" }),
+      makeTrophy({ aggregate_id: "wu-rsplash", colors: "WUr" }), // same main pair WU
+    ];
+    const result = selectDiverseTrophyDecks(decks);
+    // Both have main colors "WU", so they live in the same bucket of size 2 (≤5 cap).
+    expect(result).toHaveLength(2);
+  });
+});
 
 describe("upsertPlayDrawBatch", () => {
   let db: Client;

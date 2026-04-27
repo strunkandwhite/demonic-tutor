@@ -450,7 +450,7 @@ async function insertPicksAndCards(
   );
 }
 
-function extractColors(manaCost: string): string {
+export function extractColors(manaCost: string): string {
   const colors = new Set<string>();
   const regex = /\{([WUBRG])\}/g;
   let match;

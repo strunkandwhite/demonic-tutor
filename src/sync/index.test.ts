@@ -3,6 +3,7 @@ import type { Client } from "@libsql/client";
 import { createTestDb } from "@/test/db";
 import {
   applyGameDraftLinks,
+  extractColors,
   parseGameLink,
   parseGameIdFromS3Path,
   type GameLinkUpdate,
@@ -57,6 +58,33 @@ describe("parseGameIdFromS3Path", () => {
 
   it("returns null for paths without .json.gz extension", () => {
     expect(parseGameIdFromS3Path("s3://17lands-game-histories/20260122/abc123.json")).toBeNull();
+  });
+});
+
+describe("extractColors", () => {
+  it("returns empty string for colorless costs", () => {
+    expect(extractColors("")).toBe("");
+    expect(extractColors("{1}")).toBe("");
+    expect(extractColors("{2}{3}")).toBe("");
+  });
+
+  it("extracts a single color", () => {
+    expect(extractColors("{R}")).toBe("R");
+    expect(extractColors("{2}{R}{R}")).toBe("R");
+  });
+
+  it("dedupes repeated colors", () => {
+    expect(extractColors("{W}{W}{W}")).toBe("W");
+  });
+
+  it("returns colors sorted in WUBRG order", () => {
+    // Source order R, U, W → expected WUR (sorted alphabetically — sort is plain string sort)
+    expect(extractColors("{R}{U}{W}")).toBe("RUW");
+  });
+
+  it("ignores hybrid and phyrexian symbols", () => {
+    // Plan-aligned: regex only matches /\{([WUBRG])\}/g, so hybrid {W/U} and {U/P} don't count.
+    expect(extractColors("{W/U}{U/P}{R}")).toBe("R");
   });
 });
 
