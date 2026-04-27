@@ -131,23 +131,29 @@ describe("executeToolCall caching", () => {
     expect(queries.listDrafts).not.toHaveBeenCalled();
   });
 
-  it("caches non-set_user_context results on miss", async () => {
+  it("caches non-set_user_context results on miss (second call hits cache)", async () => {
     const cache = new ToolResultCache();
-    expect(cache.has("get_draft", { draft_id: "abc" })).toBe(false);
 
+    // First call: miss → underlying query runs.
     await executeToolCall("get_draft", { draft_id: "abc" }, cache);
+    expect(queries.getDraft).toHaveBeenCalledTimes(1);
 
-    expect(cache.has("get_draft", { draft_id: "abc" })).toBe(true);
+    // Second call with same args: hit → underlying query does NOT run again.
+    await executeToolCall("get_draft", { draft_id: "abc" }, cache);
+    expect(queries.getDraft).toHaveBeenCalledTimes(1);
   });
 
-  it("set_user_context bypasses the cache (does not store, never reads)", async () => {
+  it("set_user_context bypasses the cache (each call invokes the impl)", async () => {
     const cache = new ToolResultCache();
     const intent = { mode: "maximize_wins" as const, forced_archetype: null, constraints: [] };
 
-    await executeToolCall("set_user_context", { intent }, cache);
+    // Pre-seed a cache entry under the same key — set_user_context should ignore it.
+    cache.set("set_user_context", { intent }, '{"ok":"stale"}');
 
-    // Result should not be in the cache (bypass).
-    expect(cache.has("set_user_context", { intent })).toBe(false);
+    const result = await executeToolCall("set_user_context", { intent }, cache);
+    expect(JSON.parse(result.output)).toEqual({ ok: true });
+    // userContext is built fresh from args, not from the stale cached output.
+    expect(result.userContext).toEqual({ intent });
   });
 });
 

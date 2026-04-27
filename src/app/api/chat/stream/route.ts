@@ -25,6 +25,9 @@ export async function POST(request: NextRequest) {
   if (!rateLimit.allowed) {
     return rateLimitResponse(rateLimit.resetMs);
   }
+  const rateLimitHeaders = {
+    "X-RateLimit-Remaining": String(rateLimit.remaining),
+  };
 
   const body = (await request.json()) as ChatStreamRequest;
 
@@ -67,6 +70,7 @@ export async function POST(request: NextRequest) {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       "X-Accel-Buffering": "no",
+      ...rateLimitHeaders,
     },
   });
 }

@@ -204,7 +204,6 @@ async function linkGamesToDrafts(
           unlinkedById.delete(gameId);
         }
       }
-      // Note: Rate limiting handled by client.enforceRateLimit()
     } catch (err) {
       console.error(`Failed to get event details for ${draftId}:`, err);
     }
@@ -310,8 +309,6 @@ async function sync() {
       await insertPicksAndCards(db, draft.id, detail);
 
       syncedSets[draft.expansion] = (syncedSets[draft.expansion] || 0) + 1;
-
-      // Note: Rate limiting handled by client.enforceRateLimit()
     }
 
     const summary = Object.entries(syncedSets)
