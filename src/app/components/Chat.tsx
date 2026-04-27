@@ -33,9 +33,8 @@ interface Message {
   content: string;
 }
 
-let messageIdCounter = 0;
 function generateMessageId(): string {
-  return `msg-${Date.now()}-${++messageIdCounter}`;
+  return `msg-${crypto.randomUUID()}`;
 }
 
 interface ChatProps {
