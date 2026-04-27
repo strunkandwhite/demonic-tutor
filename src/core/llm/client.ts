@@ -278,6 +278,7 @@ export async function* chatStream(
     try {
       currentResponse = await openai.responses.create({
         model,
+        instructions,
         previous_response_id: currentResponse.id,
         input: toolResults,
         tools: [...tools],
