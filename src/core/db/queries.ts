@@ -5,7 +5,7 @@
 import { getClient } from "./client";
 import type {
   Draft,
-  Pick,
+  DraftPick,
   CardStats,
   Card,
   FormatColorStats,
@@ -72,7 +72,7 @@ export async function listDrafts(params: ListDraftsParams): Promise<Draft[]> {
 
 export async function getDraft(draftId: string): Promise<{
   draft: Draft | null;
-  picks: Pick[];
+  picks: DraftPick[];
 }> {
   const db = await getClient();
 
@@ -99,7 +99,7 @@ export interface CardData {
 
 export async function getDraftWithCardData(draftId: string): Promise<{
   draft: Draft | null;
-  picks: Pick[];
+  picks: DraftPick[];
   games: Game[];
   cardData: Record<string, CardData>;
 }> {

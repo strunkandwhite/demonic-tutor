@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ColorSymbols } from "./ColorSymbols";
 import { FormatBadge } from "./FormatBadge";
 import { PickRow } from "./PickRow";
-import type { Draft, Pick, Game } from "@/core/db/schema";
+import type { Draft, DraftPick, Game } from "@/core/db/schema";
 import type { CardData } from "@/core/db/queries";
 import { parseAvailableCards } from "@/core/db/utils";
 
@@ -15,7 +15,7 @@ interface DraftDetailProps {
 
 interface DraftResponse {
   draft: Draft;
-  picks: Pick[];
+  picks: DraftPick[];
   cardData: Record<string, CardData>;
   games: Game[];
 }

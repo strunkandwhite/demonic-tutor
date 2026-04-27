@@ -6,7 +6,7 @@
 import type { Row } from "@libsql/client";
 import type {
   Draft,
-  Pick,
+  DraftPick,
   CardStats,
   Decklist,
   FormatColorStats,
@@ -70,9 +70,9 @@ export function mapDraft(row: Row): Draft {
 }
 
 /**
- * Map a database row to a Pick object with validation.
+ * Map a database row to a DraftPick object with validation.
  */
-export function mapPick(row: Row): Pick {
+export function mapPick(row: Row): DraftPick {
   return {
     draft_id: getString(row, "draft_id"),
     pack_number: getNumber(row, "pack_number"),
