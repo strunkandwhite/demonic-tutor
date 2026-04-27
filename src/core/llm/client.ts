@@ -129,79 +129,28 @@ export async function* chatStream(
   });
 
   const instructions = buildInstructions(userContext);
-
-  let currentResponse;
-  try {
-    currentResponse = await openai.responses.create({
-      model,
-      instructions,
-      ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
-      input: message,
-      tools: [...tools],
-      reasoning: { effort: "medium" },
-    });
-  } catch (err) {
-    yield { type: "error", message: err instanceof Error ? err.message : "OpenAI request failed" };
-    return;
-  }
-
-  let newUserContext: UserContext | undefined = userContext;
   const cache = new ToolResultCache();
+  let nextInput: string | OpenAI.Responses.ResponseInputItem[] = message;
+  let currentPreviousResponseId: string | undefined = previousResponseId;
+  let finalResponseId: string | undefined;
+  let newUserContext: UserContext | undefined = userContext;
+  let assembledText = "";
 
-  while (currentResponse.output.some((o) => o.type === "function_call")) {
-    const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
-
-    for (const output of currentResponse.output) {
-      if (output.type === "function_call") {
-        const name = output.name;
-
-        if (!isValidToolName(name)) {
-          toolResults.push({
-            type: "function_call_output",
-            call_id: output.call_id,
-            output: JSON.stringify({ error: `Unknown tool: ${name}` }),
-          });
-          continue;
-        }
-
-        const args = JSON.parse(output.arguments);
-
-        // Yield tool call start event
-        yield {
-          type: "tool_call_start",
-          call_id: output.call_id,
-          name,
-          arguments: args,
-        };
-
-        const result = await executeToolCall(name, args, cache);
-
-        // Yield tool call complete event
-        yield {
-          type: "tool_call_complete",
-          call_id: output.call_id,
-        };
-
-        toolResults.push({
-          type: "function_call_output",
-          call_id: output.call_id,
-          output: result.output,
-        });
-
-        if (result.userContext) {
-          newUserContext = result.userContext;
-        }
-      }
-    }
-
+  // Loop: open a stream, consume events, run any tool calls it asks for,
+  // then re-open with tool results until the model emits no more tool calls.
+  // Streaming keeps the connection alive throughout reasoning and avoids the
+  // long-idle drops that hit the non-streaming path on slow reasoning turns.
+  while (true) {
+    let stream: AsyncIterable<OpenAI.Responses.ResponseStreamEvent>;
     try {
-      currentResponse = await openai.responses.create({
+      stream = await openai.responses.create({
         model,
         instructions,
-        previous_response_id: currentResponse.id,
-        input: toolResults,
+        ...(currentPreviousResponseId ? { previous_response_id: currentPreviousResponseId } : {}),
+        input: nextInput,
         tools: [...tools],
         reasoning: { effort: "medium" },
+        stream: true,
       });
     } catch (err) {
       yield {
@@ -210,18 +159,104 @@ export async function* chatStream(
       };
       return;
     }
-  }
 
-  const textOutput = currentResponse.output.find((o) => o.type === "message");
-  const text =
-    textOutput?.type === "message"
-      ? textOutput.content.map((c) => (c.type === "output_text" ? c.text : "")).join("")
-      : "";
+    // call_id lives on the function_call output item (which comes via
+    // response.output_item.added) but isn't on the arguments.done event,
+    // so we map item_id -> call_id during the stream.
+    const callIdByItemId = new Map<string, string>();
+    const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
+    // Reset the assembled text for this iteration. Final-response.text matches
+    // the LAST iteration's text, the same shape the non-streaming path emitted.
+    assembledText = "";
+
+    try {
+      for await (const event of stream) {
+        switch (event.type) {
+          case "response.output_item.added":
+            if (event.item.type === "function_call" && event.item.id) {
+              callIdByItemId.set(event.item.id, event.item.call_id);
+            }
+            break;
+
+          case "response.function_call_arguments.done": {
+            const callId = callIdByItemId.get(event.item_id);
+            if (!callId) break;
+
+            if (!isValidToolName(event.name)) {
+              toolResults.push({
+                type: "function_call_output",
+                call_id: callId,
+                output: JSON.stringify({ error: `Unknown tool: ${event.name}` }),
+              });
+              break;
+            }
+
+            let args: Record<string, unknown>;
+            try {
+              args = JSON.parse(event.arguments);
+            } catch {
+              toolResults.push({
+                type: "function_call_output",
+                call_id: callId,
+                output: JSON.stringify({ error: `Invalid JSON arguments for ${event.name}` }),
+              });
+              break;
+            }
+
+            yield { type: "tool_call_start", call_id: callId, name: event.name, arguments: args };
+            const result = await executeToolCall(event.name, args, cache);
+            yield { type: "tool_call_complete", call_id: callId };
+
+            toolResults.push({
+              type: "function_call_output",
+              call_id: callId,
+              output: result.output,
+            });
+            if (result.userContext) {
+              newUserContext = result.userContext;
+            }
+            break;
+          }
+
+          case "response.output_text.delta":
+            assembledText += event.delta;
+            yield { type: "text_delta", delta: event.delta };
+            break;
+
+          case "response.completed":
+            finalResponseId = event.response.id;
+            break;
+
+          case "error":
+            yield { type: "error", message: event.message ?? "OpenAI stream error" };
+            return;
+
+          default:
+            // Reasoning, queued, in_progress, output_item.done, etc. are not
+            // surfaced to the client.
+            break;
+        }
+      }
+    } catch (err) {
+      yield {
+        type: "error",
+        message: err instanceof Error ? err.message : "OpenAI stream failed",
+      };
+      return;
+    }
+
+    if (toolResults.length === 0) {
+      break;
+    }
+
+    currentPreviousResponseId = finalResponseId;
+    nextInput = toolResults;
+  }
 
   yield {
     type: "final_response",
-    text,
-    responseId: currentResponse.id,
+    text: assembledText,
+    responseId: finalResponseId ?? "",
     model,
     userContext: newUserContext,
   };

@@ -4,6 +4,11 @@
 
 import type { UserContext } from "./tools";
 
+export interface TextDeltaEvent {
+  type: "text_delta";
+  delta: string;
+}
+
 export interface ToolCallStartEvent {
   type: "tool_call_start";
   call_id: string;
@@ -30,6 +35,7 @@ export interface ErrorEvent {
 }
 
 export type StreamEvent =
+  | TextDeltaEvent
   | ToolCallStartEvent
   | ToolCallCompleteEvent
   | FinalResponseEvent

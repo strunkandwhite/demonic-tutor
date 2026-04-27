@@ -9,6 +9,7 @@ interface UseChatStreamResult {
   sendMessage: (message: string, onComplete: (result: FinalResponseEvent) => void) => void;
   activeToolCalls: ToolCallInfo[];
   completedToolCalls: ToolCallInfo[];
+  streamingText: string;
   isStreaming: boolean;
   error: string | null;
 }
@@ -20,6 +21,7 @@ export function useChatStream(
 ): UseChatStreamResult {
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCallInfo[]>([]);
   const [completedToolCalls, setCompletedToolCalls] = useState<ToolCallInfo[]>([]);
+  const [streamingText, setStreamingText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +30,7 @@ export function useChatStream(
       setIsStreaming(true);
       setActiveToolCalls([]);
       setCompletedToolCalls([]);
+      setStreamingText("");
       setError(null);
 
       try {
@@ -74,7 +77,14 @@ export function useChatStream(
               }
 
               switch (event.type) {
+                case "text_delta":
+                  setStreamingText((prev) => prev + event.delta);
+                  break;
+
                 case "tool_call_start":
+                  // Clear any pre-tool text — the user-facing answer is the
+                  // text emitted AFTER tools resolve, matching final_response.
+                  setStreamingText("");
                   setActiveToolCalls((prev) => [
                     ...prev,
                     {
@@ -106,6 +116,7 @@ export function useChatStream(
 
                 case "final_response":
                   setActiveToolCalls([]);
+                  setStreamingText("");
                   onComplete(event);
                   break;
 
@@ -127,5 +138,5 @@ export function useChatStream(
     [model, previousResponseId, userContext]
   );
 
-  return { sendMessage, activeToolCalls, completedToolCalls, isStreaming, error };
+  return { sendMessage, activeToolCalls, completedToolCalls, streamingText, isStreaming, error };
 }

@@ -89,6 +89,7 @@ export function Chat({ draftId }: ChatProps) {
     sendMessage: streamMessage,
     activeToolCalls,
     completedToolCalls,
+    streamingText,
     isStreaming,
     error: streamError,
   } = useChatStream(model, responseId, userContext);
@@ -265,6 +266,33 @@ export function Chat({ draftId }: ChatProps) {
                 </div>
               );
             })}
+
+            {/* Live streaming text — rendered as an in-flight assistant bubble.
+                Cleared on tool_call_start (the answer text comes after tools)
+                and on final_response (when the persisted message takes over). */}
+            {isStreaming && streamingText && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] rounded-lg bg-zinc-100 px-4 py-2 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
+                  <div className="prose prose-sm prose-zinc max-w-none dark:prose-invert">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      urlTransform={safeUrlTransform}
+                      components={{
+                        a: ({ href, children }) => {
+                          if (href?.startsWith("card:")) {
+                            const cardName = decodeURIComponent(href.slice(5));
+                            return <CardLink name={cardName} />;
+                          }
+                          return <a href={href}>{children}</a>;
+                        },
+                      }}
+                    >
+                      {processCardLinks(streamingText)}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Tool call indicator */}
             {isStreaming && (
