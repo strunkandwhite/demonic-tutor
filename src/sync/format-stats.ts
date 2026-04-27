@@ -2,7 +2,12 @@
  * Sync format-level stats from 17lands: play/draw rates, color ratings, card stats, and trophy decklists.
  */
 
-import type { SeventeenLandsClient, SeventeenLandsTrophyDeck } from "../core/seventeen-lands";
+import type {
+  SeventeenLandsClient,
+  SeventeenLandsTrophyDeck,
+  SeventeenLandsColorRating,
+  SeventeenLandsPlayDrawStats,
+} from "../core/seventeen-lands";
 import type { Client as DbClient } from "../core/db/client";
 import { upsertDecklist } from "./decklists";
 
@@ -82,6 +87,72 @@ async function wasUpdatedThisWeek(
 }
 
 /**
+ * Upsert all play/draw stats in a single multi-row INSERT ... ON CONFLICT.
+ * No-op when stats is empty.
+ */
+export async function upsertPlayDrawBatch(
+  db: DbClient,
+  stats: readonly SeventeenLandsPlayDrawStats[],
+  now: string
+): Promise<void> {
+  if (stats.length === 0) return;
+  const placeholders = stats.map(() => "(?, ?, ?, ?, ?, ?)").join(", ");
+  const args = stats.flatMap((s) => [
+    s.expansion,
+    s.event_type,
+    s.average_game_length,
+    s.win_rate_on_play,
+    s.sample_size,
+    now,
+  ]);
+  await db.execute({
+    sql: `INSERT INTO format_play_draw ("set", event_type, avg_game_length, play_win_rate, sample_size, updated_at)
+          VALUES ${placeholders}
+          ON CONFLICT("set", event_type) DO UPDATE SET
+            avg_game_length = excluded.avg_game_length,
+            play_win_rate = excluded.play_win_rate,
+            sample_size = excluded.sample_size,
+            updated_at = excluded.updated_at`,
+    args,
+  });
+}
+
+/**
+ * Upsert all color ratings for a set in a single multi-row INSERT ... ON CONFLICT.
+ * No-op when ratings is empty.
+ */
+export async function upsertColorRatingsBatch(
+  db: DbClient,
+  set: string,
+  ratings: readonly SeventeenLandsColorRating[],
+  now: string
+): Promise<void> {
+  if (ratings.length === 0) return;
+  const placeholders = ratings.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+  const args = ratings.flatMap((r) => [
+    set,
+    "PremierDraft",
+    String(r.short_name),
+    r.color_name,
+    r.wins,
+    r.games,
+    r.is_summary ? 1 : 0,
+    now,
+  ]);
+  await db.execute({
+    sql: `INSERT INTO format_color_stats ("set", event_type, color_code, color_name, wins, games, is_summary, updated_at)
+          VALUES ${placeholders}
+          ON CONFLICT("set", event_type, color_code) DO UPDATE SET
+            color_name = excluded.color_name,
+            wins = excluded.wins,
+            games = excluded.games,
+            is_summary = excluded.is_summary,
+            updated_at = excluded.updated_at`,
+    args,
+  });
+}
+
+/**
  * Count existing trophy decklists for a set.
  */
 async function getTrophyDecklistCount(db: DbClient, set: string): Promise<number> {
@@ -129,25 +200,7 @@ export async function syncFormatStats(
         );
       }
     } else {
-      for (const stat of relevantPlayDraw) {
-        await db.execute({
-          sql: `INSERT INTO format_play_draw ("set", event_type, avg_game_length, play_win_rate, sample_size, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT("set", event_type) DO UPDATE SET
-                  avg_game_length = excluded.avg_game_length,
-                  play_win_rate = excluded.play_win_rate,
-                  sample_size = excluded.sample_size,
-                  updated_at = excluded.updated_at`,
-          args: [
-            stat.expansion,
-            stat.event_type,
-            stat.average_game_length,
-            stat.win_rate_on_play,
-            stat.sample_size,
-            now,
-          ],
-        });
-      }
+      await upsertPlayDrawBatch(db, relevantPlayDraw, now);
       console.log(`[turso] Upserted ${relevantPlayDraw.length} play/draw stats`);
     }
   }
@@ -180,28 +233,7 @@ export async function syncFormatStats(
             console.log(`    ... and ${colorRatings.length - 5} more`);
           }
         } else {
-          for (const rating of colorRatings) {
-            await db.execute({
-              sql: `INSERT INTO format_color_stats ("set", event_type, color_code, color_name, wins, games, is_summary, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT("set", event_type, color_code) DO UPDATE SET
-                      color_name = excluded.color_name,
-                      wins = excluded.wins,
-                      games = excluded.games,
-                      is_summary = excluded.is_summary,
-                      updated_at = excluded.updated_at`,
-              args: [
-                set,
-                "PremierDraft", // Default event type for color ratings
-                String(rating.short_name),
-                rating.color_name,
-                rating.wins,
-                rating.games,
-                rating.is_summary ? 1 : 0,
-                now,
-              ],
-            });
-          }
+          await upsertColorRatingsBatch(db, set, colorRatings, now);
           console.log(`[turso] Upserted ${colorRatings.length} color ratings for ${set}`);
         }
       }
