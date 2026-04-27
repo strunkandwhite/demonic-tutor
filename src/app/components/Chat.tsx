@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CardLink } from "./CardLink";
 import { ToolCallIndicator } from "./ToolCallIndicator";
+import { safeUrlTransform } from "./safeUrlTransform";
 import { useChatStream } from "@/app/hooks/useChatStream";
 import { usePersistedChat } from "@/app/hooks/usePersistedChat";
 import type { UserContext } from "@/core/llm/tools";
@@ -22,7 +23,7 @@ function processCardLinks(text: string): string {
 }
 
 const MODELS: { id: ModelId; label: string }[] = [
-  { id: "gpt-5.2-2025-12-11", label: "GPT-5.2" },
+  { id: "gpt-5.5-2026-04-23", label: "GPT-5.5" },
   { id: "gpt-4o-mini", label: "GPT-4o Mini" },
 ];
 
@@ -32,9 +33,8 @@ interface Message {
   content: string;
 }
 
-let messageIdCounter = 0;
 function generateMessageId(): string {
-  return `msg-${Date.now()}-${++messageIdCounter}`;
+  return `msg-${crypto.randomUUID()}`;
 }
 
 interface ChatProps {
@@ -54,7 +54,7 @@ export function Chat({ draftId }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [model, setModel] = useState<ModelId>("gpt-5.2-2025-12-11");
+  const [model, setModel] = useState<ModelId>("gpt-5.5-2026-04-23");
   const [responseId, setResponseId] = useState<string | null>(null);
   const [userContext, setUserContext] = useState<UserContext | undefined>(() => {
     if (draftId) {
@@ -246,10 +246,7 @@ export function Chat({ draftId }: ChatProps) {
                       <div className="prose prose-sm prose-zinc max-w-none dark:prose-invert">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
-                          urlTransform={(url) => {
-                            if (url.startsWith("card:")) return url;
-                            return url;
-                          }}
+                          urlTransform={safeUrlTransform}
                           components={{
                             a: ({ href, children }) => {
                               if (href?.startsWith("card:")) {

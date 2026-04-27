@@ -1,5 +1,10 @@
 # Demonic Tutor - Personal MTG Draft Analytics
 
+> **Superseded by** the later 2026-01-23 implementation plan (`2026-01-23-implementation-plan.md`)
+> and the follow-on design / implementation plans for seventeen-lands sync,
+> games-and-cards expansion, decklists, Bo1 card stats, and game links + draft chat.
+> Kept for historical context.
+
 Personal app for collecting and analyzing MTG Arena draft data from 17lands.
 
 ## Overview

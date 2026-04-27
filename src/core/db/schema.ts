@@ -15,12 +15,12 @@ export interface Draft {
   synced_at: string;
 }
 
-export interface Pick {
+export interface DraftPick {
   draft_id: string;
   pack_number: number;
   pick_number: number;
   card_name: string;
-  available_cards: string; // JSON array
+  available_cards: string[]; // parsed in mapPick (column itself is TEXT JSON)
 }
 
 export interface Card {

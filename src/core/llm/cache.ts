@@ -30,25 +30,4 @@ export class ToolResultCache {
   set(name: string, args: Record<string, unknown>, result: string): void {
     this.cache.set(this.makeKey(name, args), result);
   }
-
-  /**
-   * Check if a result is cached.
-   */
-  has(name: string, args: Record<string, unknown>): boolean {
-    return this.cache.has(this.makeKey(name, args));
-  }
-
-  /**
-   * Clear the cache (useful for testing).
-   */
-  clear(): void {
-    this.cache.clear();
-  }
-
-  /**
-   * Get cache statistics.
-   */
-  get size(): number {
-    return this.cache.size;
-  }
 }

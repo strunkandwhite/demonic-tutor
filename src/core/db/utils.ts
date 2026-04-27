@@ -1,10 +1,15 @@
 /**
- * Parses the available_cards JSON string from picks table.
+ * Small DB-related helpers shared across sync layers.
  */
-export function parseAvailableCards(json: string): string[] {
-  try {
-    return JSON.parse(json);
-  } catch {
-    return [];
+
+/**
+ * Count occurrences of each card id in an array (e.g. a deck group's
+ * `cards: number[]` field, where duplicates indicate quantity > 1).
+ */
+export function countCards(cardIds: number[]): Map<number, number> {
+  const counts = new Map<number, number>();
+  for (const id of cardIds) {
+    counts.set(id, (counts.get(id) || 0) + 1);
   }
+  return counts;
 }

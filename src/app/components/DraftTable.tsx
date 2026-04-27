@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ColorSymbols } from "./ColorSymbols";
 import { FormatBadge } from "./FormatBadge";
 import type { Draft } from "@/core/db/schema";
@@ -29,12 +29,9 @@ interface DraftTableProps {
 
 export function DraftTable({ drafts, set }: DraftTableProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const selectDraft = (id: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("draft", id);
-    router.push(`/?${params.toString()}`);
+    router.push(`/draft/${id}`);
   };
 
   if (drafts.length === 0) {

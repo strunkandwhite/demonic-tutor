@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatStream, AVAILABLE_MODELS, type ModelId, type UserContext } from "@/core/llm";
 import { validateAuth } from "../../auth";
+import { assertSameOrigin } from "../../origin-check";
 import { checkRateLimit, rateLimitResponse } from "../../rate-limit";
 
 interface ChatStreamRequest {
@@ -11,6 +12,10 @@ interface ChatStreamRequest {
 }
 
 export async function POST(request: NextRequest) {
+  // Same-origin check (defense against CSRF/cross-site POST)
+  const originError = assertSameOrigin(request);
+  if (originError) return originError;
+
   // Validate authentication
   const authError = validateAuth(request);
   if (authError) return authError;
@@ -20,6 +25,9 @@ export async function POST(request: NextRequest) {
   if (!rateLimit.allowed) {
     return rateLimitResponse(rateLimit.resetMs);
   }
+  const rateLimitHeaders = {
+    "X-RateLimit-Remaining": String(rateLimit.remaining),
+  };
 
   const body = (await request.json()) as ChatStreamRequest;
 
@@ -28,7 +36,7 @@ export async function POST(request: NextRequest) {
   }
 
   const model: ModelId =
-    body.model && AVAILABLE_MODELS.includes(body.model) ? body.model : "gpt-5.2-2025-12-11";
+    body.model && AVAILABLE_MODELS.includes(body.model) ? body.model : "gpt-5.5-2026-04-23";
 
   const encoder = new TextEncoder();
 
@@ -62,6 +70,7 @@ export async function POST(request: NextRequest) {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       "X-Accel-Buffering": "no",
+      ...rateLimitHeaders,
     },
   });
 }

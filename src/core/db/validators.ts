@@ -6,7 +6,7 @@
 import type { Row } from "@libsql/client";
 import type {
   Draft,
-  Pick,
+  DraftPick,
   CardStats,
   Decklist,
   FormatColorStats,
@@ -70,15 +70,26 @@ export function mapDraft(row: Row): Draft {
 }
 
 /**
- * Map a database row to a Pick object with validation.
+ * Map a database row to a DraftPick object with validation.
+ *
+ * `available_cards` is stored as a JSON-encoded TEXT column; parse once
+ * here so consumers always get string[].
  */
-export function mapPick(row: Row): Pick {
+export function mapPick(row: Row): DraftPick {
+  const raw = getString(row, "available_cards");
+  let available: string[] = [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) available = parsed.filter((s): s is string => typeof s === "string");
+  } catch {
+    // malformed JSON → empty list (matches old parseAvailableCards behavior)
+  }
   return {
     draft_id: getString(row, "draft_id"),
     pack_number: getNumber(row, "pack_number"),
     pick_number: getNumber(row, "pick_number"),
     card_name: getString(row, "card_name"),
-    available_cards: getString(row, "available_cards"),
+    available_cards: available,
   };
 }
 

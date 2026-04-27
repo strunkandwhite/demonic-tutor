@@ -166,6 +166,12 @@ describe("set_user_context tool", () => {
     it("returns false for invalid tool names", () => {
       expect(isValidToolName("invalid_tool")).toBe(false);
     });
+
+    it("returns true for every name in the tools array (parity)", () => {
+      for (const t of tools) {
+        expect(isValidToolName(t.name)).toBe(true);
+      }
+    });
   });
 
   describe("executeToolCall", () => {

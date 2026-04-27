@@ -1,26 +1,16 @@
 "use client";
 
+import { TOOL_LABELS, isValidToolName } from "@/core/llm/tools";
+
 export interface ToolCallInfo {
   call_id: string;
   name: string;
   arguments: Record<string, unknown>;
 }
 
-const TOOL_LABELS: Record<string, string> = {
-  list_drafts: "Searching drafts",
-  get_draft: "Loading draft",
-  get_my_stats: "Calculating stats",
-  get_my_card_history: "Looking up card history",
-  get_card_stats: "Fetching 17lands data",
-  get_format_top_cards: "Finding top cards",
-  get_deck: "Loading decklist",
-  search_decks: "Searching decklists",
-  analyze_deck_choices: "Analyzing deck choices",
-  get_card_info: "Getting card info",
-  set_user_context: "Setting context",
-  get_format_meta: "Loading format data",
-  get_trophy_decks: "Finding trophy decks",
-};
+function labelFor(name: string): string {
+  return isValidToolName(name) ? TOOL_LABELS[name] : name;
+}
 
 function formatArguments(args: Record<string, unknown>): string {
   const entries = Object.entries(args).filter(([, v]) => v !== undefined && v !== null && v !== "");
@@ -56,7 +46,7 @@ export function ToolCallIndicator({ activeToolCalls, completedToolCalls }: ToolC
                   ✓
                 </div>
                 <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                  <span>{TOOL_LABELS[tc.name] || tc.name}</span>
+                  <span>{labelFor(tc.name)}</span>
                   {argsStr && <span className="ml-1">({argsStr})</span>}
                 </div>
               </div>
@@ -70,7 +60,7 @@ export function ToolCallIndicator({ activeToolCalls, completedToolCalls }: ToolC
               <div key={tc.call_id} className="flex items-center gap-2">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-600 dark:border-t-zinc-300" />
                 <div className="text-sm text-zinc-700 dark:text-zinc-300">
-                  <span className="font-medium">{TOOL_LABELS[tc.name] || tc.name}</span>
+                  <span className="font-medium">{labelFor(tc.name)}</span>
                   {argsStr && (
                     <span className="ml-1 text-zinc-500 dark:text-zinc-400">({argsStr})</span>
                   )}

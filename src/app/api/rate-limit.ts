@@ -35,6 +35,10 @@ function cleanOldTimestamps(timestamps: number[], windowMs: number): number[] {
 
 interface RateLimitResult {
   allowed: boolean;
+  /**
+   * Number of requests still permitted in the current window. Surfaced to
+   * clients via the X-RateLimit-Remaining response header on success.
+   */
   remaining: number;
   resetMs: number;
 }

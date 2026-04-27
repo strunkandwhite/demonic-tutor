@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import type { StreamEvent, FinalResponseEvent, ModelId } from "@/core/llm";
 import type { UserContext } from "@/core/llm/tools";
 import type { ToolCallInfo } from "@/app/components/ToolCallIndicator";
@@ -11,7 +11,6 @@ interface UseChatStreamResult {
   completedToolCalls: ToolCallInfo[];
   isStreaming: boolean;
   error: string | null;
-  abort: () => void;
 }
 
 export function useChatStream(
@@ -23,7 +22,6 @@ export function useChatStream(
   const [completedToolCalls, setCompletedToolCalls] = useState<ToolCallInfo[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
     async (message: string, onComplete: (result: FinalResponseEvent) => void) => {
@@ -31,8 +29,6 @@ export function useChatStream(
       setActiveToolCalls([]);
       setCompletedToolCalls([]);
       setError(null);
-
-      abortControllerRef.current = new AbortController();
 
       try {
         const response = await fetch("/api/chat/stream", {
@@ -44,7 +40,6 @@ export function useChatStream(
             previousResponseId,
             userContext,
           }),
-          signal: abortControllerRef.current.signal,
         });
 
         if (!response.ok) {
@@ -122,7 +117,7 @@ export function useChatStream(
           }
         }
       } catch (err) {
-        if (err instanceof Error && err.name !== "AbortError") {
+        if (err instanceof Error) {
           setError(err.message);
         }
       } finally {
@@ -132,9 +127,5 @@ export function useChatStream(
     [model, previousResponseId, userContext]
   );
 
-  const abort = useCallback(() => {
-    abortControllerRef.current?.abort();
-  }, []);
-
-  return { sendMessage, activeToolCalls, completedToolCalls, isStreaming, error, abort };
+  return { sendMessage, activeToolCalls, completedToolCalls, isStreaming, error };
 }

@@ -18,7 +18,7 @@ export interface UserContext {
   currentDraftId?: string;
 }
 
-export const tools: OpenAI.Responses.Tool[] = [
+export const tools = [
   {
     type: "function",
     name: "list_drafts",
@@ -250,37 +250,30 @@ export const tools: OpenAI.Responses.Tool[] = [
     },
     strict: false,
   },
-];
+] as const satisfies readonly OpenAI.Responses.Tool[];
 
-export type ToolName =
-  | "list_drafts"
-  | "get_draft"
-  | "get_my_stats"
-  | "get_my_card_history"
-  | "get_card_stats"
-  | "get_format_top_cards"
-  | "get_deck"
-  | "search_decks"
-  | "analyze_deck_choices"
-  | "get_card_info"
-  | "set_user_context"
-  | "get_format_meta"
-  | "get_trophy_decks";
+export type ToolName = (typeof tools)[number]["name"];
 
 export function isValidToolName(name: string): name is ToolName {
-  return [
-    "list_drafts",
-    "get_draft",
-    "get_my_stats",
-    "get_my_card_history",
-    "get_card_stats",
-    "get_format_top_cards",
-    "get_deck",
-    "search_decks",
-    "analyze_deck_choices",
-    "get_card_info",
-    "set_user_context",
-    "get_format_meta",
-    "get_trophy_decks",
-  ].includes(name);
+  return tools.some((t) => t.name === name);
 }
+
+/**
+ * UI-facing labels for each tool. Typed as Record<ToolName, string> so TS
+ * forces every tool to have a label (and rejects orphans if a tool is removed).
+ */
+export const TOOL_LABELS: Record<ToolName, string> = {
+  list_drafts: "Searching drafts",
+  get_draft: "Loading draft",
+  get_my_stats: "Calculating stats",
+  get_my_card_history: "Looking up card history",
+  get_card_stats: "Fetching 17lands data",
+  get_format_top_cards: "Finding top cards",
+  get_deck: "Loading decklist",
+  search_decks: "Searching decklists",
+  analyze_deck_choices: "Analyzing deck choices",
+  get_card_info: "Getting card info",
+  set_user_context: "Setting context",
+  get_format_meta: "Loading format data",
+  get_trophy_decks: "Finding trophy decks",
+};
