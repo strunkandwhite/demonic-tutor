@@ -446,7 +446,10 @@ function extractColors(manaCost: string): string {
   return Array.from(colors).sort().join("");
 }
 
-sync().catch((err) => {
-  console.error("Sync failed:", err);
-  process.exit(1);
-});
+const isDirectRun = process.argv[1]?.includes("sync/index");
+if (isDirectRun) {
+  sync().catch((err) => {
+    console.error("Sync failed:", err);
+    process.exit(1);
+  });
+}
