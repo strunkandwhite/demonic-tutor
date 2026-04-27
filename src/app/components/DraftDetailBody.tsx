@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { ColorSymbols } from "./ColorSymbols";
 import { PickRow } from "./PickRow";
+import { replayUrl } from "@/app/lib/replayUrl";
 import type { Draft, DraftPick, Game } from "@/core/db/schema";
 import type { CardData } from "@/core/db/queries";
 
@@ -85,11 +86,12 @@ export function DraftDetailBody({ draft, picks, games, cardData }: DraftDetailBo
                   </span>
                 );
 
-                if (game.replay_link) {
+                const url = replayUrl(game);
+                if (url) {
                   return (
                     <a
                       key={game.id}
-                      href={`https://www.17lands.com${game.replay_link}`}
+                      href={url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="transition-opacity hover:opacity-80"
