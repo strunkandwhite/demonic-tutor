@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useCardImage } from "../hooks/useCardImage";
+import { cardImageUrl } from "@/app/lib/cardImageUrl";
 
 interface CardLinkProps {
   name: string;
 }
 
 export function CardLink({ name }: CardLinkProps) {
-  const imageUrl = useCardImage(name);
+  const imageUrl = cardImageUrl({ name });
   const [showPreview, setShowPreview] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const ref = useRef<HTMLSpanElement>(null);
