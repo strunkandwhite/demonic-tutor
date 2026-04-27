@@ -33,7 +33,9 @@ export function getClient(): Promise<Client> {
 
 export function closeClient(): void {
   if (clientPromise) {
-    clientPromise.then((client) => client.close()).catch(() => {});
+    clientPromise
+      .then((client) => client.close())
+      .catch((err) => console.warn("[db] closeClient failed:", err));
     clientPromise = null;
   }
 }
