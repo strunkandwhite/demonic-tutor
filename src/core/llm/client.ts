@@ -160,10 +160,6 @@ export async function* chatStream(
       return;
     }
 
-    // call_id lives on the function_call output item (which comes via
-    // response.output_item.added) but isn't on the arguments.done event,
-    // so we map item_id -> call_id during the stream.
-    const callIdByItemId = new Map<string, string>();
     const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
     // Reset the assembled text for this iteration. Final-response.text matches
     // the LAST iteration's text, the same shape the non-streaming path emitted.
@@ -172,48 +168,59 @@ export async function* chatStream(
     try {
       for await (const event of stream) {
         switch (event.type) {
-          case "response.output_item.added":
-            if (event.item.type === "function_call" && event.item.id) {
-              callIdByItemId.set(event.item.id, event.item.call_id);
-            }
-            break;
+          // output_item.done carries the complete function_call item (call_id,
+          // name, finalized arguments) in one place — simpler and safer than
+          // cross-referencing function_call_arguments.done with output_item.added.
+          case "response.output_item.done": {
+            if (event.item.type !== "function_call") break;
 
-          case "response.function_call_arguments.done": {
-            const callId = callIdByItemId.get(event.item_id);
-            if (!callId) break;
+            const { call_id, name, arguments: argsString } = event.item;
 
-            if (!isValidToolName(event.name)) {
+            if (!isValidToolName(name)) {
+              console.error(`[chatStream] Unknown tool: ${name}`);
               toolResults.push({
                 type: "function_call_output",
-                call_id: callId,
-                output: JSON.stringify({ error: `Unknown tool: ${event.name}` }),
+                call_id,
+                output: JSON.stringify({ error: `Unknown tool: ${name}` }),
               });
               break;
             }
 
             let args: Record<string, unknown>;
             try {
-              args = JSON.parse(event.arguments);
-            } catch {
+              args = JSON.parse(argsString);
+            } catch (err) {
+              console.error(`[chatStream] Failed to parse arguments for ${name}:`, argsString, err);
               toolResults.push({
                 type: "function_call_output",
-                call_id: callId,
-                output: JSON.stringify({ error: `Invalid JSON arguments for ${event.name}` }),
+                call_id,
+                output: JSON.stringify({ error: `Invalid JSON arguments for ${name}` }),
               });
               break;
             }
 
-            yield { type: "tool_call_start", call_id: callId, name: event.name, arguments: args };
-            const result = await executeToolCall(event.name, args, cache);
-            yield { type: "tool_call_complete", call_id: callId };
-
-            toolResults.push({
-              type: "function_call_output",
-              call_id: callId,
-              output: result.output,
-            });
-            if (result.userContext) {
-              newUserContext = result.userContext;
+            yield { type: "tool_call_start", call_id, name, arguments: args };
+            try {
+              const result = await executeToolCall(name, args, cache);
+              yield { type: "tool_call_complete", call_id };
+              toolResults.push({
+                type: "function_call_output",
+                call_id,
+                output: result.output,
+              });
+              if (result.userContext) {
+                newUserContext = result.userContext;
+              }
+            } catch (err) {
+              console.error(`[chatStream] Tool ${name} threw:`, err);
+              yield { type: "tool_call_complete", call_id };
+              toolResults.push({
+                type: "function_call_output",
+                call_id,
+                output: JSON.stringify({
+                  error: err instanceof Error ? err.message : `Tool ${name} failed`,
+                }),
+              });
             }
             break;
           }
@@ -228,12 +235,14 @@ export async function* chatStream(
             break;
 
           case "error":
+            console.error("[chatStream] OpenAI stream error event:", event);
             yield { type: "error", message: event.message ?? "OpenAI stream error" };
             return;
 
           default:
-            // Reasoning, queued, in_progress, output_item.done, etc. are not
-            // surfaced to the client.
+            // Reasoning, queued, in_progress, output_item.added,
+            // function_call_arguments.delta/done, output_text.done, etc.
+            // are not surfaced to the client.
             break;
         }
       }
