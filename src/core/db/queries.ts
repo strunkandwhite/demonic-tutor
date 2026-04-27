@@ -95,6 +95,7 @@ export async function getDraft(draftId: string): Promise<{
 export interface CardData {
   manaCost: string | null;
   gihWr: number | null;
+  imageUrl: string | null;
 }
 
 export async function getDraftWithCardData(draftId: string): Promise<{
@@ -148,7 +149,7 @@ export async function getDraftWithCardData(draftId: string): Promise<{
   const cardNames = Array.from(allCardNames);
   const placeholders = cardNames.map(() => "?").join(", ");
   const cardsResult = await db.execute({
-    sql: `SELECT c.name, c.mana_cost, cs.game_in_hand_wr
+    sql: `SELECT c.name, c.mana_cost, c.image_url, cs.game_in_hand_wr
           FROM cards c
           LEFT JOIN card_stats cs ON cs.card_name = c.name AND cs."set" = ?
           WHERE c.name IN (${placeholders})`,
@@ -161,13 +162,14 @@ export async function getDraftWithCardData(draftId: string): Promise<{
     cardData[name] = {
       manaCost: row.mana_cost as string | null,
       gihWr: row.game_in_hand_wr as number | null,
+      imageUrl: row.image_url as string | null,
     };
   }
 
   // Ensure all card names have entries (even if no data found)
   for (const name of cardNames) {
     if (!cardData[name]) {
-      cardData[name] = { manaCost: null, gihWr: null };
+      cardData[name] = { manaCost: null, gihWr: null, imageUrl: null };
     }
   }
 

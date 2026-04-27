@@ -36,7 +36,7 @@ function CardDisplay({
     <span className={`inline-flex items-center gap-1 ${isBold ? "font-bold" : ""}`}>
       <ManaSymbols manaCost={data?.manaCost ?? null} size={size} />
       <span className="text-zinc-500 dark:text-zinc-400">[{gihWr}]</span>
-      <CardLink name={name} />
+      <CardLink name={name} imageUrl={data?.imageUrl} />
     </span>
   );
 }

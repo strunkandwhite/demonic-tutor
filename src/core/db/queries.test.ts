@@ -83,8 +83,38 @@ describe("getDraftWithCardData", () => {
     const result = await getDraftWithCardData("d1");
 
     expect(result.draft?.id).toBe("d1");
-    expect(result.cardData["Lightning Bolt"]).toEqual({ manaCost: "{R}", gihWr: 0.62 });
-    expect(result.cardData["Plains"]).toEqual({ manaCost: "", gihWr: null });
+    expect(result.cardData["Lightning Bolt"]).toEqual({
+      manaCost: "{R}",
+      gihWr: 0.62,
+      imageUrl: null,
+    });
+    expect(result.cardData["Plains"]).toEqual({
+      manaCost: "",
+      gihWr: null,
+      imageUrl: null,
+    });
+  });
+
+  it("surfaces cards.image_url alongside stats", async () => {
+    await db.execute({
+      sql: `INSERT INTO drafts (id, "set", format, colors, wins, losses, draft_date, synced_at)
+            VALUES ('d2', 'TST', 'PremierDraft', 'R', 7, 0, '2026-01-01', '2026-01-01T00:00:00Z')`,
+      args: [],
+    });
+    await db.batch([
+      {
+        sql: `INSERT INTO cards (name, mana_cost, image_url) VALUES (?, ?, ?)`,
+        args: ["Lightning Bolt", "{R}", "https://cdn.example/bolt.jpg"],
+      },
+      {
+        sql: `INSERT INTO picks (draft_id, pack_number, pick_number, card_name, available_cards)
+              VALUES (?, ?, ?, ?, ?)`,
+        args: ["d2", 0, 0, "Lightning Bolt", JSON.stringify(["Lightning Bolt"])],
+      },
+    ]);
+
+    const result = await getDraftWithCardData("d2");
+    expect(result.cardData["Lightning Bolt"].imageUrl).toBe("https://cdn.example/bolt.jpg");
   });
 
   it("returns empty cardData when there are no picks", async () => {
@@ -129,7 +159,7 @@ describe("getDraftWithCardData", () => {
     ]);
 
     const result = await getDraftWithCardData("d1");
-    expect(result.cardData["Plains"]).toEqual({ manaCost: "", gihWr: null });
+    expect(result.cardData["Plains"]).toEqual({ manaCost: "", gihWr: null, imageUrl: null });
   });
 });
 
