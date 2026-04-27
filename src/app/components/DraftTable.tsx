@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ColorSymbols } from "./ColorSymbols";
 import { FormatBadge } from "./FormatBadge";
+import { isTrophy } from "@/app/lib/isTrophy";
 import type { Draft } from "@/core/db/schema";
 
 function RankDisplay({ startRank, endRank }: { startRank: string | null; endRank: string | null }) {
@@ -109,7 +110,7 @@ export function DraftTable({ drafts, set }: DraftTableProps) {
               <td className="px-4 py-3">
                 <span
                   className={
-                    draft.wins === 7
+                    isTrophy(draft)
                       ? "font-bold text-amber-500"
                       : "text-zinc-900 dark:text-zinc-100"
                   }

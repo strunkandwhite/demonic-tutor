@@ -245,6 +245,10 @@ describe("getMyStats", () => {
     await seedDraft(db, { id: "a", colors: "WU", wins: 7, losses: 0 });
     await seedDraft(db, { id: "b", colors: "WU", wins: 4, losses: 3 });
     await seedDraft(db, { id: "c", colors: "BG", wins: 1, losses: 3 });
+    // Bo3 trophy: 3-0 should count.
+    await seedDraft(db, { id: "d", colors: "BG", wins: 3, losses: 0 });
+    // Bo3 near-miss: 3-1 should NOT count.
+    await seedDraft(db, { id: "e", colors: "BG", wins: 3, losses: 1 });
   });
 
   afterEach(() => {
@@ -252,16 +256,16 @@ describe("getMyStats", () => {
     db.close();
   });
 
-  it("aggregates totals and color_breakdown", async () => {
+  it("aggregates totals and color_breakdown, counting Bo1 7-x and Bo3 3-0 as trophies", async () => {
     const stats = await getMyStats({});
-    expect(stats.total_drafts).toBe(3);
-    expect(stats.total_wins).toBe(12);
-    expect(stats.total_losses).toBe(6);
-    expect(stats.trophies).toBe(1);
-    expect(stats.win_rate).toBeCloseTo(12 / 18, 6);
+    expect(stats.total_drafts).toBe(5);
+    expect(stats.total_wins).toBe(18);
+    expect(stats.total_losses).toBe(7);
+    expect(stats.trophies).toBe(2);
+    expect(stats.win_rate).toBeCloseTo(18 / 25, 6);
     expect(stats.color_breakdown).toEqual({
       WU: { drafts: 2, wins: 11, losses: 3 },
-      BG: { drafts: 1, wins: 1, losses: 3 },
+      BG: { drafts: 3, wins: 7, losses: 4 },
     });
   });
 

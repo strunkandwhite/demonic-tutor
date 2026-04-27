@@ -221,7 +221,7 @@ export async function getMyStats(params: MyStatsParams): Promise<MyStats> {
             COUNT(*) as total_drafts,
             SUM(wins) as total_wins,
             SUM(losses) as total_losses,
-            SUM(CASE WHEN wins = 7 THEN 1 ELSE 0 END) as trophies,
+            SUM(CASE WHEN wins = 7 OR (wins = 3 AND losses = 0) THEN 1 ELSE 0 END) as trophies,
             colors
           FROM drafts ${where}
           GROUP BY colors

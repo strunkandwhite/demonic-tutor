@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { ColorSymbols } from "./ColorSymbols";
 import { PickRow } from "./PickRow";
+import { isTrophy } from "@/app/lib/isTrophy";
 import { replayUrl } from "@/app/lib/replayUrl";
 import type { Draft, DraftPick, Game } from "@/core/db/schema";
 import type { CardData } from "@/core/db/queries";
@@ -44,7 +45,7 @@ export function DraftDetailBody({ draft, picks, games, cardData }: DraftDetailBo
           <div>
             <div className="text-sm text-zinc-500 dark:text-zinc-400">Record</div>
             <div
-              className={`text-xl ${draft.wins === 7 ? "font-bold text-amber-500" : "text-zinc-900 dark:text-zinc-100"}`}
+              className={`text-xl ${isTrophy(draft) ? "font-bold text-amber-500" : "text-zinc-900 dark:text-zinc-100"}`}
             >
               {draft.wins}-{draft.losses}
             </div>
