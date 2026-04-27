@@ -1,5 +1,4 @@
 import { getDraftWithCardData } from "@/core/db/queries";
-import { parseAvailableCards } from "@/core/db/utils";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Chat } from "@/app/components/Chat";
@@ -150,7 +149,7 @@ export default async function DraftPage({ params }: Props) {
                     packNumber={pick.pack_number}
                     pickNumber={pick.pick_number}
                     cardName={pick.card_name}
-                    availableCards={parseAvailableCards(pick.available_cards)}
+                    availableCards={pick.available_cards}
                     cardData={cardData}
                   />
                 ))}

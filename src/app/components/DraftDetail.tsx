@@ -7,7 +7,6 @@ import { FormatBadge } from "./FormatBadge";
 import { PickRow } from "./PickRow";
 import type { Draft, DraftPick, Game } from "@/core/db/schema";
 import type { CardData } from "@/core/db/queries";
-import { parseAvailableCards } from "@/core/db/utils";
 
 interface DraftDetailProps {
   draftId: string;
@@ -210,7 +209,7 @@ export function DraftDetail({ draftId }: DraftDetailProps) {
                   packNumber={pick.pack_number}
                   pickNumber={pick.pick_number}
                   cardName={pick.card_name}
-                  availableCards={parseAvailableCards(pick.available_cards)}
+                  availableCards={pick.available_cards}
                   cardData={cardData}
                 />
               ))}

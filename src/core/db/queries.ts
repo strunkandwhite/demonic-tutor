@@ -134,13 +134,8 @@ export async function getDraftWithCardData(draftId: string): Promise<{
   const allCardNames = new Set<string>();
   for (const pick of picks) {
     allCardNames.add(pick.card_name);
-    try {
-      const available = JSON.parse(pick.available_cards) as string[];
-      for (const name of available) {
-        allCardNames.add(name);
-      }
-    } catch {
-      // ignore parse errors
+    for (const name of pick.available_cards) {
+      allCardNames.add(name);
     }
   }
 
