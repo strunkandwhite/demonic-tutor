@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CardLink } from "./CardLink";
 import { ToolCallIndicator } from "./ToolCallIndicator";
+import { safeUrlTransform } from "./safeUrlTransform";
 import { useChatStream } from "@/app/hooks/useChatStream";
 import { usePersistedChat } from "@/app/hooks/usePersistedChat";
 import type { UserContext } from "@/core/llm/tools";
@@ -246,10 +247,7 @@ export function Chat({ draftId }: ChatProps) {
                       <div className="prose prose-sm prose-zinc max-w-none dark:prose-invert">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
-                          urlTransform={(url) => {
-                            if (url.startsWith("card:")) return url;
-                            return url;
-                          }}
+                          urlTransform={safeUrlTransform}
                           components={{
                             a: ({ href, children }) => {
                               if (href?.startsWith("card:")) {
