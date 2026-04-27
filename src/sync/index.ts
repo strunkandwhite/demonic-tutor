@@ -143,64 +143,78 @@ export function parseGameIdFromS3Path(s3Path: string): string | null {
   return match ? match[1] : null;
 }
 
+export interface GameLinkUpdate {
+  /** Full row id, i.e. the value of games.id (gameId + "_" + originalGameNumber) */
+  fullId: string;
+  draftId: string;
+  /** Canonical game_number from event_details (may differ from id suffix). */
+  gameNumber: number;
+}
+
+/**
+ * Apply a batch of game→draft link updates in a single db.batch.
+ * Pure function — does no HTTP and no orphan-marking, so tests can drive it
+ * with a fixture instead of mocking the 17lands client.
+ */
+export async function applyGameDraftLinks(
+  db: DbClient,
+  updates: readonly GameLinkUpdate[]
+): Promise<void> {
+  if (updates.length === 0) return;
+  const statements = updates.map((u) => ({
+    sql: "UPDATE games SET draft_id = ?, game_number = ? WHERE id = ?",
+    args: [u.draftId, u.gameNumber, u.fullId] as InValue[],
+  }));
+  await db.batch(statements);
+}
+
 async function linkGamesToDrafts(
   db: DbClient,
   api: ReturnType<typeof createSeventeenLandsClient>,
   draftIds: Set<string>
 ) {
-  // Only process non-orphaned unlinked games
-  const unlinkedResult = await db.execute(
-    "SELECT COUNT(*) as count FROM games WHERE draft_id IS NULL AND (orphaned IS NULL OR orphaned = 0)"
+  // Get unlinked game IDs along with their full row id (gameId_originalNum).
+  const gamesResult = await db.execute(
+    "SELECT id, SUBSTR(id, 1, INSTR(id, '_') - 1) as game_id FROM games WHERE draft_id IS NULL AND (orphaned IS NULL OR orphaned = 0)"
   );
-  const unlinkedCount = unlinkedResult.rows[0].count as number;
-
-  if (unlinkedCount === 0) {
+  if (gamesResult.rows.length === 0) {
     return;
   }
 
-  console.log(`Linking ${unlinkedCount} unlinked games to drafts...`);
+  console.log(`Linking ${gamesResult.rows.length} unlinked games to drafts...`);
 
-  // Get unlinked game IDs for matching (extract ID before underscore)
-  const gamesResult = await db.execute(
-    "SELECT DISTINCT SUBSTR(id, 1, INSTR(id, '_') - 1) as game_id FROM games WHERE draft_id IS NULL AND (orphaned IS NULL OR orphaned = 0)"
-  );
-  const unlinkedGameIds = new Set(gamesResult.rows.map((r) => r.game_id as string));
+  const unlinkedById = new Map<string, string>(); // gameId → fullId
+  for (const r of gamesResult.rows) {
+    unlinkedById.set(r.game_id as string, r.id as string);
+  }
 
-  let updated = 0;
+  // Walk drafts, fetch event_details (HTTP), and collect updates.
+  const updates: GameLinkUpdate[] = [];
   for (const draftId of draftIds) {
+    if (unlinkedById.size === 0) break;
     try {
       const eventDetails = await api.getEventDetails(draftId);
-
       for (const match of eventDetails.details.match_results) {
         for (const game of match.game_results) {
           const gameId = parseGameIdFromS3Path(game.history_s3_path);
-          if (gameId && unlinkedGameIds.has(gameId)) {
-            const result = await db.execute({
-              sql: "UPDATE games SET draft_id = ?, game_number = ? WHERE id LIKE ?",
-              args: [draftId, game.game_number, `${gameId}%`],
-            });
-            if (result.rowsAffected > 0) {
-              console.log(`[turso] Linked game ${gameId} to draft ${draftId}`);
-              updated++;
-              unlinkedGameIds.delete(gameId);
-            }
-          }
+          if (!gameId) continue;
+          const fullId = unlinkedById.get(gameId);
+          if (!fullId) continue;
+          updates.push({ fullId, draftId, gameNumber: game.game_number });
+          unlinkedById.delete(gameId);
         }
       }
-
-      // Stop early if all games are linked
-      if (unlinkedGameIds.size === 0) break;
-
       // Note: Rate limiting handled by client.enforceRateLimit()
     } catch (err) {
       console.error(`Failed to get event details for ${draftId}:`, err);
     }
   }
 
-  console.log(`[turso] Linked ${updated} games to drafts`);
+  await applyGameDraftLinks(db, updates);
+  console.log(`[turso] Linked ${updates.length} games to drafts`);
 
   // Mark remaining unlinked games as orphaned
-  if (unlinkedGameIds.size > 0) {
+  if (unlinkedById.size > 0) {
     const orphanResult = await db.execute(
       "UPDATE games SET orphaned = 1 WHERE draft_id IS NULL AND (orphaned IS NULL OR orphaned = 0)"
     );
