@@ -137,7 +137,7 @@ export async function* chatStream(
       instructions,
       ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
       input: message,
-      tools,
+      tools: [...tools],
       reasoning: { effort: "medium" },
     });
   } catch (err) {
@@ -199,7 +199,7 @@ export async function* chatStream(
         model,
         previous_response_id: currentResponse.id,
         input: toolResults,
-        tools,
+        tools: [...tools],
         reasoning: { effort: "medium" },
       });
     } catch (err) {
