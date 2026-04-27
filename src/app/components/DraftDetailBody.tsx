@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { ColorSymbols } from "./ColorSymbols";
 import { PickRow } from "./PickRow";
 import type { Draft, DraftPick, Game } from "@/core/db/schema";
@@ -12,10 +13,7 @@ interface DraftDetailBodyProps {
   cardData: Record<string, CardData>;
 }
 
-export function DraftDetailBody({ draft, picks, games, cardData }: DraftDetailBodyProps) {
-  const hasRankInfo = !!(draft.start_rank || draft.end_rank);
-
-  // Group picks by pack (Task 19 will memoize this).
+function groupPicksByPack(picks: DraftPick[]): Record<number, DraftPick[]> {
   const packs: Record<number, DraftPick[]> = {};
   for (const pick of picks) {
     if (!packs[pick.pack_number]) {
@@ -23,6 +21,14 @@ export function DraftDetailBody({ draft, picks, games, cardData }: DraftDetailBo
     }
     packs[pick.pack_number].push(pick);
   }
+  return packs;
+}
+
+export function DraftDetailBody({ draft, picks, games, cardData }: DraftDetailBodyProps) {
+  const hasRankInfo = !!(draft.start_rank || draft.end_rank);
+
+  // Memoize per-pack grouping so expanding a single PickRow doesn't redo it.
+  const packs = useMemo(() => groupPicksByPack(picks), [picks]);
 
   return (
     <>

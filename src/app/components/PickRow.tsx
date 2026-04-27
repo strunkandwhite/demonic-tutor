@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { CardLink } from "./CardLink";
 import { ManaSymbols } from "./ManaSymbols";
 import type { CardData } from "@/core/db/queries";
@@ -41,13 +41,7 @@ function CardDisplay({
   );
 }
 
-export function PickRow({
-  packNumber,
-  pickNumber,
-  cardName,
-  availableCards,
-  cardData,
-}: PickRowProps) {
+function PickRowImpl({ packNumber, pickNumber, cardName, availableCards, cardData }: PickRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   // 17lands sometimes doesn't capture full P1P1 pack data (returns only the picked card)
@@ -108,3 +102,10 @@ export function PickRow({
     </div>
   );
 }
+
+/**
+ * Memoize so siblings don't re-render when one row toggles its expanded state.
+ * Props are mostly primitives plus a stable cardData reference (constructed
+ * once per render in the SSR page).
+ */
+export const PickRow = memo(PickRowImpl);
