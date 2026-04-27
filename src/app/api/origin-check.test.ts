@@ -50,6 +50,13 @@ describe("assertSameOrigin", () => {
     expect(result?.status).toBe(500);
   });
 
+  it("returns null in dev when SITE_ORIGIN is unset (any origin allowed)", () => {
+    const result = assertSameOrigin(makeRequest("http://localhost:3001"), {
+      NODE_ENV: "development",
+    });
+    expect(result).toBeNull();
+  });
+
   it("uses VERCEL_ENV over NODE_ENV when set", () => {
     // VERCEL_ENV=preview means non-production even if NODE_ENV=production.
     const result = assertSameOrigin(makeRequest(null), {

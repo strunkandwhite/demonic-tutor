@@ -16,9 +16,9 @@ function validateEnvironment() {
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
-    console.error("Missing required environment variables:", missing.join(", "));
-    console.error("Please set these in your .env.local file");
-    process.exit(1);
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}. Please set these in your .env.local file.`
+    );
   }
 
   // API_SECRET: fail closed in production (Vercel or otherwise), warn in dev/preview.

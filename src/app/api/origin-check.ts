@@ -20,6 +20,10 @@ export function assertSameOrigin(
     return NextResponse.json({ error: "SITE_ORIGIN not configured" }, { status: 500 });
   }
 
+  // In dev without SITE_ORIGIN configured, allow any origin so local
+  // browser dev works without forcing every dev to set the env var.
+  if (!isProduction && !expected) return null;
+
   const origin = request.headers.get("origin");
 
   if (!origin) {
@@ -28,7 +32,7 @@ export function assertSameOrigin(
     return NextResponse.json({ error: "Origin header required" }, { status: 403 });
   }
 
-  if (expected && origin === expected) return null;
+  if (origin === expected) return null;
 
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
