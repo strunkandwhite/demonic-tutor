@@ -23,7 +23,7 @@ function processCardLinks(text: string): string {
 }
 
 const MODELS: { id: ModelId; label: string }[] = [
-  { id: "gpt-5.2-2025-12-11", label: "GPT-5.2" },
+  { id: "gpt-5.5-2026-04-23", label: "GPT-5.5" },
   { id: "gpt-4o-mini", label: "GPT-4o Mini" },
 ];
 
@@ -54,7 +54,7 @@ export function Chat({ draftId }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [model, setModel] = useState<ModelId>("gpt-5.2-2025-12-11");
+  const [model, setModel] = useState<ModelId>("gpt-5.5-2026-04-23");
   const [responseId, setResponseId] = useState<string | null>(null);
   const [userContext, setUserContext] = useState<UserContext | undefined>(() => {
     if (draftId) {

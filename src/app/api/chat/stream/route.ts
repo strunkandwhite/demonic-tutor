@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   }
 
   const model: ModelId =
-    body.model && AVAILABLE_MODELS.includes(body.model) ? body.model : "gpt-5.2-2025-12-11";
+    body.model && AVAILABLE_MODELS.includes(body.model) ? body.model : "gpt-5.5-2026-04-23";
 
   const encoder = new TextEncoder();
 
