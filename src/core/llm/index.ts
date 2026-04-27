@@ -1,4 +1,4 @@
-export { chat, chatStream, AVAILABLE_MODELS, type ModelId } from "./client";
+export { chatStream, AVAILABLE_MODELS, type ModelId } from "./client";
 export type {
   StreamEvent,
   ToolCallStartEvent,

@@ -77,13 +77,6 @@ Never skip brackets. The UI depends on them for card image previews. If this ins
 export const AVAILABLE_MODELS = ["gpt-5.2-2025-12-11", "gpt-4o-mini"] as const;
 export type ModelId = (typeof AVAILABLE_MODELS)[number];
 
-export interface ChatResult {
-  text: string;
-  responseId: string;
-  model: string;
-  userContext?: UserContext;
-}
-
 function buildInstructions(userContext?: UserContext): string {
   if (!userContext) {
     return SYSTEM_PROMPT;
@@ -111,91 +104,6 @@ The user is currently viewing a specific draft (ID: ${userContext.currentDraftId
   }
 
   return instructions;
-}
-
-export async function chat(
-  message: string,
-  model: ModelId = "gpt-5.2-2025-12-11",
-  previousResponseId?: string,
-  userContext?: UserContext
-): Promise<ChatResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY environment variable is not set");
-  }
-
-  const openai = new OpenAI({
-    apiKey,
-    timeout: 10 * 60 * 1000, // 10 minutes (reasoning can be slow)
-    maxRetries: 0, // Disable retries to prevent conversation forking
-  });
-
-  const instructions = buildInstructions(userContext);
-  const response = await openai.responses.create({
-    model,
-    instructions,
-    ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
-    input: message,
-    tools,
-    reasoning: { effort: "medium" },
-  });
-
-  // Handle tool calls with request-scoped cache
-  let currentResponse = response;
-  let newUserContext: UserContext | undefined = userContext;
-  const cache = new ToolResultCache();
-
-  while (currentResponse.output.some((o) => o.type === "function_call")) {
-    const toolResults: OpenAI.Responses.ResponseInputItem[] = [];
-
-    for (const output of currentResponse.output) {
-      if (output.type === "function_call") {
-        const name = output.name;
-        if (!isValidToolName(name)) {
-          toolResults.push({
-            type: "function_call_output",
-            call_id: output.call_id,
-            output: JSON.stringify({ error: `Unknown tool: ${name}` }),
-          });
-          continue;
-        }
-
-        const args = JSON.parse(output.arguments);
-        const result = await executeToolCall(name, args, cache);
-        toolResults.push({
-          type: "function_call_output",
-          call_id: output.call_id,
-          output: result.output,
-        });
-
-        // Capture userContext if set_user_context was called
-        if (result.userContext) {
-          newUserContext = result.userContext;
-        }
-      }
-    }
-
-    currentResponse = await openai.responses.create({
-      model,
-      previous_response_id: currentResponse.id,
-      input: toolResults,
-      tools,
-      reasoning: { effort: "medium" },
-    });
-  }
-
-  const textOutput = currentResponse.output.find((o) => o.type === "message");
-  const text =
-    textOutput?.type === "message"
-      ? textOutput.content.map((c) => (c.type === "output_text" ? c.text : "")).join("")
-      : "";
-
-  return {
-    text,
-    responseId: currentResponse.id,
-    model,
-    userContext: newUserContext,
-  };
 }
 
 /**
