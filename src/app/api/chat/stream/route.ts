@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatStream, AVAILABLE_MODELS, type ModelId, type UserContext } from "@/core/llm";
 import { validateAuth } from "../../auth";
+import { assertSameOrigin } from "../../origin-check";
 import { checkRateLimit, rateLimitResponse } from "../../rate-limit";
 
 interface ChatStreamRequest {
@@ -11,6 +12,10 @@ interface ChatStreamRequest {
 }
 
 export async function POST(request: NextRequest) {
+  // Same-origin check (defense against CSRF/cross-site POST)
+  const originError = assertSameOrigin(request);
+  if (originError) return originError;
+
   // Validate authentication
   const authError = validateAuth(request);
   if (authError) return authError;
