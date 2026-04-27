@@ -2,12 +2,9 @@
  * Sync format-level stats from 17lands: play/draw rates, color ratings, card stats, and trophy decklists.
  */
 
-import type {
-  SeventeenLandsClient,
-  SeventeenLandsTrophyDeck,
-  SeventeenLandsDeck,
-} from "../core/seventeen-lands";
+import type { SeventeenLandsClient, SeventeenLandsTrophyDeck } from "../core/seventeen-lands";
 import type { Client as DbClient } from "../core/db/client";
+import { upsertDecklist } from "./decklists";
 
 /**
  * Extract main colors from trophy deck color string.
@@ -93,81 +90,6 @@ async function getTrophyDecklistCount(db: DbClient, set: string): Promise<number
     args: [set],
   });
   return Number(result.rows[0].count);
-}
-
-/**
- * Insert a trophy decklist into the database.
- */
-async function insertTrophyDecklist(
-  db: DbClient,
-  draftId: string,
-  set: string,
-  deck: SeventeenLandsDeck
-): Promise<void> {
-  const colors = deck.main_colors || "unknown";
-
-  // Check if we already have cards for this deck
-  const existing = await db.execute({
-    sql: `SELECT 1 FROM decklist_cards WHERE draft_id = ? LIMIT 1`,
-    args: [draftId],
-  });
-  if (existing.rows.length > 0) {
-    console.log(`  [turso] Skipping ${draftId} (${colors}) - already exists`);
-    return;
-  }
-
-  // Insert decklist metadata with source='trophy'
-  await db.execute({
-    sql: `INSERT OR IGNORE INTO decklists (draft_id, "set", main_colors, splash_colors, source)
-          VALUES (?, ?, ?, ?, 'trophy')`,
-    args: [draftId, set, deck.main_colors || null, deck.splash_colors || null],
-  });
-  console.log(`  [turso] Inserted decklist ${draftId} (${colors})`);
-
-  // Count cards by ID
-  const countCards = (cardIds: number[]): Map<number, number> => {
-    const counts = new Map<number, number>();
-    for (const id of cardIds) {
-      counts.set(id, (counts.get(id) || 0) + 1);
-    }
-    return counts;
-  };
-
-  // Process each group (Maindeck, Sideboard)
-  let cardsInserted = 0;
-  for (const group of deck.groups) {
-    const isMaindeck = group.name === "Maindeck" ? 1 : 0;
-    const cardCounts = countCards(group.cards);
-
-    for (const [cardId, quantity] of cardCounts) {
-      const card = deck.cards[cardId.toString()];
-      if (!card) continue;
-
-      // Upsert card if missing
-      await db.execute({
-        sql: `INSERT OR IGNORE INTO cards (name, image_url, types, mana_cost, colors, cmc, rarity)
-              VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          card.name,
-          card.image_url,
-          card.types.join(" "),
-          card.mana_cost,
-          card.color_identity.join(""),
-          card.cmc,
-          card.rarity,
-        ],
-      });
-
-      // Insert decklist card
-      await db.execute({
-        sql: `INSERT OR IGNORE INTO decklist_cards (draft_id, card_name, quantity, is_maindeck)
-              VALUES (?, ?, ?, ?)`,
-        args: [draftId, card.name, quantity, isMaindeck],
-      });
-      cardsInserted++;
-    }
-  }
-  console.log(`  [turso] Inserted ${cardsInserted} cards for ${draftId}`);
 }
 
 export async function syncFormatStats(
@@ -377,8 +299,15 @@ export async function syncFormatStats(
           for (const trophyDeck of selectedDecks) {
             try {
               const deck = await api.getDeck(trophyDeck.aggregate_id, trophyDeck.deck_index);
-              await insertTrophyDecklist(db, trophyDeck.aggregate_id, set, deck);
-              synced++;
+              const result = await upsertDecklist(db, trophyDeck.aggregate_id, set, deck, "trophy");
+              if (result.inserted) {
+                synced++;
+                console.log(
+                  `  [turso] Inserted trophy deck ${trophyDeck.aggregate_id} (${result.cardsInserted} cards)`
+                );
+              } else {
+                console.log(`  [turso] Skipping ${trophyDeck.aggregate_id} - already exists`);
+              }
             } catch (err) {
               failed++;
               const errMsg = err instanceof Error ? err.message : String(err);
