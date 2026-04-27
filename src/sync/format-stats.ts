@@ -51,40 +51,37 @@ function selectDiverseTrophyDecks(decks: SeventeenLandsTrophyDeck[]): SeventeenL
   return selected.slice(0, 30);
 }
 
-/**
- * Check if format_color_stats for a set was updated in the last week.
- */
-async function wasColorStatsUpdatedThisWeek(db: DbClient, set: string): Promise<boolean> {
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const result = await db.execute({
-    sql: `SELECT 1 FROM format_color_stats WHERE "set" = ? AND updated_at >= ? LIMIT 1`,
-    args: [set, weekAgo],
-  });
-  return result.rows.length > 0;
-}
+type WeeklyTable = "format_color_stats" | "format_play_draw" | "card_stats";
+const WEEKLY_TABLES: readonly WeeklyTable[] = [
+  "format_color_stats",
+  "format_play_draw",
+  "card_stats",
+];
 
 /**
- * Check if card_stats for a set was updated in the last week.
+ * Check if any row in the given table was updated in the last week.
+ *
+ * Pass `set` to scope the check to a single set (uses the `"set"` column,
+ * which is a SQL reserved word and must be quoted). Table name is an
+ * allowlist literal — never interpolate user input here.
  */
-async function wasCardStatsUpdatedThisWeek(db: DbClient, set: string): Promise<boolean> {
+async function wasUpdatedThisWeek(
+  db: DbClient,
+  table: WeeklyTable,
+  set?: string
+): Promise<boolean> {
+  if (!WEEKLY_TABLES.includes(table)) {
+    throw new Error(`wasUpdatedThisWeek: invalid table ${table}`);
+  }
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const result = await db.execute({
-    sql: `SELECT 1 FROM card_stats WHERE "set" = ? AND updated_at >= ? LIMIT 1`,
-    args: [set, weekAgo],
-  });
-  return result.rows.length > 0;
-}
-
-/**
- * Check if format_play_draw was updated in the last week.
- */
-async function wasPlayDrawUpdatedThisWeek(db: DbClient): Promise<boolean> {
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const result = await db.execute({
-    sql: `SELECT 1 FROM format_play_draw WHERE updated_at >= ? LIMIT 1`,
-    args: [weekAgo],
-  });
-  return result.rows.length > 0;
+  const sql =
+    set === undefined
+      ? `SELECT MAX(updated_at) AS last FROM ${table}`
+      : `SELECT MAX(updated_at) AS last FROM ${table} WHERE "set" = ?`;
+  const args = set === undefined ? [] : [set];
+  const result = await db.execute({ sql, args });
+  const last = result.rows[0]?.last as string | null | undefined;
+  return !!last && last >= weekAgo;
 }
 
 /**
@@ -192,7 +189,7 @@ export async function syncFormatStats(
   console.log(`User has drafts in ${userSets.size} sets: ${[...userSets].join(", ")}`);
 
   // 1. Sync play/draw stats (skip if updated this week)
-  if (!dryRun && (await wasPlayDrawUpdatedThisWeek(db))) {
+  if (!dryRun && (await wasUpdatedThisWeek(db, "format_play_draw"))) {
     console.log("Skipping play/draw stats - already updated this week");
   } else {
     console.log("Syncing play/draw stats...");
@@ -237,7 +234,8 @@ export async function syncFormatStats(
   for (const set of userSets) {
     try {
       // Color stats: refresh weekly
-      const colorStatsUpToDate = !dryRun && (await wasColorStatsUpdatedThisWeek(db, set));
+      const colorStatsUpToDate =
+        !dryRun && (await wasUpdatedThisWeek(db, "format_color_stats", set));
       if (colorStatsUpToDate) {
         console.log(`Skipping ${set} color stats - already updated this week`);
       } else {
@@ -287,7 +285,7 @@ export async function syncFormatStats(
       }
 
       // Card stats: refresh weekly (PremierDraft/Bo1 aggregate data)
-      const cardStatsUpToDate = !dryRun && (await wasCardStatsUpdatedThisWeek(db, set));
+      const cardStatsUpToDate = !dryRun && (await wasUpdatedThisWeek(db, "card_stats", set));
       if (cardStatsUpToDate) {
         console.log(`Skipping ${set} card stats - already updated this week`);
       } else {
