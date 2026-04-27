@@ -267,6 +267,16 @@ export function Chat({ draftId }: ChatProps) {
               );
             })}
 
+            {/* Tool call indicator — chronologically tools fire before the
+                model emits its answer text, so render this above the live
+                streaming bubble. */}
+            {isStreaming && (
+              <ToolCallIndicator
+                activeToolCalls={activeToolCalls}
+                completedToolCalls={completedToolCalls}
+              />
+            )}
+
             {/* Live streaming text — rendered as an in-flight assistant bubble.
                 Cleared on tool_call_start (the answer text comes after tools)
                 and on final_response (when the persisted message takes over). */}
@@ -292,14 +302,6 @@ export function Chat({ draftId }: ChatProps) {
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* Tool call indicator */}
-            {isStreaming && (
-              <ToolCallIndicator
-                activeToolCalls={activeToolCalls}
-                completedToolCalls={completedToolCalls}
-              />
             )}
           </div>
         )}
