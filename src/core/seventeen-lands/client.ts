@@ -175,103 +175,35 @@ export class SeventeenLandsClient {
     this.lastApiCall = Date.now();
   }
 
-  private async fetchApi<T>(path: string, retryCount: number = 0): Promise<T> {
+  private async fetchApi<T>(
+    path: string,
+    opts: { method?: "GET" | "POST"; body?: unknown } = {},
+    retryCount: number = 0
+  ): Promise<T> {
+    const method = opts.method ?? "GET";
     const page = await this.ensureBrowser();
     const fullUrl = `${BASE_URL}${path}`;
 
     // Enforce minimum delay between API calls
     await this.enforceRateLimit();
 
-    log(`API REQUEST: ${path}`);
-    const startTime = Date.now();
-
-    try {
-      const result = await withTimeout(
-        page.evaluate(async (url: string) => {
-          const response = await fetch(url, {
-            credentials: "include",
-            headers: {
-              accept: "application/json, text/plain, */*",
-            },
-          });
-
-          // Return both status and data for logging
-          const data = response.ok ? await response.json() : null;
-          return {
-            status: response.status,
-            statusText: response.statusText,
-            ok: response.ok,
-            data,
-          };
-        }, fullUrl),
-        API_TIMEOUT_MS,
-        `GET ${path}`
-      );
-
-      const elapsed = Date.now() - startTime;
-      log(`API RESPONSE: ${result.status} ${result.statusText} (${elapsed}ms)`);
-
-      if (result.status === 401 || result.status === 403) {
-        throw new Error(`AUTH_ERROR:${result.status}`);
-      }
-
-      if (result.status === 429) {
-        throw new Error("RATE_LIMITED");
-      }
-
-      if (!result.ok) {
-        throw new Error(`API error: ${result.status} ${result.statusText}`);
-      }
-
-      return result.data as T;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const elapsed = Date.now() - startTime;
-      log(`API ERROR: ${message} (${elapsed}ms)`);
-
-      // Handle auth errors - try re-login once
-      if (message.includes("AUTH_ERROR") && retryCount === 0) {
-        log("Session expired, re-authenticating...");
-        await this.login();
-        await sleep(MIN_API_DELAY_MS, "post-auth delay");
-        return this.fetchApi<T>(path, retryCount + 1);
-      }
-
-      // Handle rate limiting
-      if (message === "RATE_LIMITED") {
-        await sleep(30000, "rate limited by server");
-        return this.fetchApi<T>(path, retryCount);
-      }
-
-      throw error;
-    }
-  }
-
-  private async fetchApiPost<T>(path: string, body: unknown, retryCount: number = 0): Promise<T> {
-    const page = await this.ensureBrowser();
-    const fullUrl = `${BASE_URL}${path}`;
-
-    // Enforce minimum delay between API calls
-    await this.enforceRateLimit();
-
-    log(`API POST: ${path}`);
+    log(`API ${method}: ${path}`);
     const startTime = Date.now();
 
     try {
       const result = await withTimeout(
         page.evaluate(
-          async ({ url, bodyData }: { url: string; bodyData: unknown }) => {
-            const response = await fetch(url, {
-              method: "POST",
+          async (args: { url: string; method: "GET" | "POST"; body?: unknown }) => {
+            const init: RequestInit = {
+              method: args.method,
               credentials: "include",
               headers: {
                 accept: "application/json, text/plain, */*",
-                "content-type": "application/json",
+                ...(args.method === "POST" ? { "content-type": "application/json" } : {}),
               },
-              body: JSON.stringify(bodyData),
-            });
-
-            // Return both status and data for logging
+              ...(args.body !== undefined ? { body: JSON.stringify(args.body) } : {}),
+            };
+            const response = await fetch(args.url, init);
             const data = response.ok ? await response.json() : null;
             return {
               status: response.status,
@@ -280,10 +212,10 @@ export class SeventeenLandsClient {
               data,
             };
           },
-          { url: fullUrl, bodyData: body }
+          { url: fullUrl, method, body: opts.body }
         ),
         API_TIMEOUT_MS,
-        `POST ${path}`
+        `${method} ${path}`
       );
 
       const elapsed = Date.now() - startTime;
@@ -312,13 +244,13 @@ export class SeventeenLandsClient {
         log("Session expired, re-authenticating...");
         await this.login();
         await sleep(MIN_API_DELAY_MS, "post-auth delay");
-        return this.fetchApiPost<T>(path, body, retryCount + 1);
+        return this.fetchApi<T>(path, opts, retryCount + 1);
       }
 
       // Handle rate limiting
       if (message === "RATE_LIMITED") {
         await sleep(30000, "rate limited by server");
-        return this.fetchApiPost<T>(path, body, retryCount);
+        return this.fetchApi<T>(path, opts, retryCount);
       }
 
       throw error;
@@ -411,7 +343,9 @@ export class SeventeenLandsClient {
       ranks: [],
       deck_colors: [],
     };
-    return withRetry(() => this.fetchApiPost<SeventeenLandsTrophyDeck[]>("/data/trophies/", body));
+    return withRetry(() =>
+      this.fetchApi<SeventeenLandsTrophyDeck[]>("/data/trophies/", { method: "POST", body })
+    );
   }
 
   async close(): Promise<void> {
