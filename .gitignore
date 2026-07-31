@@ -12,3 +12,6 @@ tsconfig.tsbuildinfo
 
 todo.md
 next-env.d.ts
+.vercel
+.env*
+!.env.example
