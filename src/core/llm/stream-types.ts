@@ -35,8 +35,4 @@ export interface ErrorEvent {
 }
 
 export type StreamEvent =
-  | TextDeltaEvent
-  | ToolCallStartEvent
-  | ToolCallCompleteEvent
-  | FinalResponseEvent
-  | ErrorEvent;
+  TextDeltaEvent | ToolCallStartEvent | ToolCallCompleteEvent | FinalResponseEvent | ErrorEvent;
