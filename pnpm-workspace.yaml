@@ -4,5 +4,4 @@ allowBuilds:
   unrs-resolver: true
 minimumReleaseAgeStrict: true
 overrides:
-  postcss: ^8.5.18
   js-yaml@>=4.0.0 <4.3.2: ">=4.3.2 <5"
